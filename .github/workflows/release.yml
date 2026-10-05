@@ -17,6 +17,14 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name }}
 
+      - name: Install Lua 5.1
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.1
+
+      - name: Validate addon
+        run: bash scripts/validate-addon.sh
+
       - name: Verify TOC version matches release tag
         shell: bash
         run: |
@@ -30,11 +38,6 @@ jobs:
               exit
             }
           ' IncomeRecordsSystem.toc)
-
-          if [ -z "$TOC_VERSION" ]; then
-            echo "ERROR: No ## Version: entry found in IncomeRecordsSystem.toc"
-            exit 1
-          fi
 
           echo "Release tag version: $TAG_VERSION"
           echo "TOC version:         $TOC_VERSION"
@@ -60,6 +63,7 @@ jobs:
 
           cp IncomeRecordsSystem.toc "$PACKAGE_DIR/"
           cp README.md "$PACKAGE_DIR/"
+          cp CHANGELOG.md "$PACKAGE_DIR/"
           cp LICENSE "$PACKAGE_DIR/"
 
           cd build

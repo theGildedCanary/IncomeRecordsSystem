@@ -1,0 +1,36 @@
+name: Feature Request
+description: Suggest an improvement or new feature for IRS.
+title: "[Feature] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement. Describe the problem or workflow first; that helps evaluate the best implementation.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem or workflow would this improve?
+      description: Explain what you are trying to accomplish and what is difficult today.
+    validations:
+      required: true
+
+  - type: textarea
+    id: request
+    attributes:
+      label: What would you like IRS to do?
+      description: Describe the feature or behavior you would find useful.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds
+      description: If you currently handle this another way, describe it here.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add examples, screenshots, mockups, or other details that would help explain the request.
