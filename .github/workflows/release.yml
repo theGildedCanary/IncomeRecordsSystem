@@ -1,0 +1,79 @@
+name: Build Release ZIP
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out release version
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Verify TOC version matches release tag
+        shell: bash
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          TAG_VERSION="${TAG#v}"
+
+          TOC_VERSION=$(awk -F: '
+            /^## Version:/ {
+              gsub(/^[ \t]+|[ \t]+$/, "", $2)
+              print $2
+              exit
+            }
+          ' IncomeRecordsSystem.toc)
+
+          if [ -z "$TOC_VERSION" ]; then
+            echo "ERROR: No ## Version: entry found in IncomeRecordsSystem.toc"
+            exit 1
+          fi
+
+          echo "Release tag version: $TAG_VERSION"
+          echo "TOC version:         $TOC_VERSION"
+
+          if [ "$TAG_VERSION" != "$TOC_VERSION" ]; then
+            echo "ERROR: Release tag and TOC version do not match."
+            exit 1
+          fi
+
+      - name: Build addon package
+        shell: bash
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          PACKAGE_DIR="build/IncomeRecordsSystem"
+          ZIP_NAME="IncomeRecordsSystem-${TAG}.zip"
+
+          mkdir -p "$PACKAGE_DIR"
+
+          cp -R Core "$PACKAGE_DIR/"
+          cp -R Features "$PACKAGE_DIR/"
+          cp -R Media "$PACKAGE_DIR/"
+          cp -R UI "$PACKAGE_DIR/"
+
+          cp IncomeRecordsSystem.toc "$PACKAGE_DIR/"
+          cp README.md "$PACKAGE_DIR/"
+          cp LICENSE "$PACKAGE_DIR/"
+
+          cd build
+          zip -r "../$ZIP_NAME" IncomeRecordsSystem
+          cd ..
+
+          echo "Created $ZIP_NAME"
+
+      - name: Attach ZIP to GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          ZIP_NAME="IncomeRecordsSystem-${TAG}.zip"
+
+          gh release upload "$TAG" "$ZIP_NAME" --clobber
