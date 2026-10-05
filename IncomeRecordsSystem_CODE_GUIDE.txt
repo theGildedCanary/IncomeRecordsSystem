@@ -1,0 +1,183 @@
+IRS — INCOME RECORDS SYSTEM
+CODE GUIDE — v0.17.3
+===========================
+
+PURPOSE
+-------
+This guide describes the current addon structure and the main data flows. It is
+not a version history.
+
+FOLDER LAYOUT
+-------------
+IncomeRecordsSystem/
+    IncomeRecordsSystem.toc
+
+    Core/
+        IncomeRecordsSystem_Core.lua
+
+    Features/
+        IncomeRecordsSystem_Transfers.lua
+        IncomeRecordsSystem_TokenMarket.lua
+        IncomeRecordsSystem_Reserves.lua
+        IncomeRecordsSystem_Tools.lua
+        IncomeRecordsSystem_Checkpoints.lua
+
+    UI/
+        IncomeRecordsSystem_UI.lua
+        IncomeRecordsSystem_Settings.lua
+        IncomeRecordsSystem_MiniDashboard.lua
+        IncomeRecordsSystem_Resize.lua
+        IncomeRecordsSystem_PageScroll.lua
+
+    Media/
+        IRSButton.png / IRSButton.tga
+        IRSTitleIcon.png / IRSTitleIcon.tga
+
+    Docs/
+        IncomeRecordsSystem_README.txt
+        IncomeRecordsSystem_CODE_GUIDE.txt
+
+The folder names describe responsibility, but TOC order still controls execution.
+Do not alphabetize the TOC unless module dependencies are also reviewed.
+
+LOAD ORDER / MODULES
+--------------------
+Core\IncomeRecordsSystem_Core.lua
+    Database initialization, character scanning, net ledger, Blizzard statistics,
+    reports, shared source history, Savings Projects, formatting, events, and
+    slash commands.
+
+Features\IncomeRecordsSystem_Transfers.lua
+    Internal-transfer matching for Warband Bank and configured Guild Banks, plus
+    transfer settings/history support.
+
+Features\IncomeRecordsSystem_TokenMarket.lua
+    Locally observed WoW Token price history and market alerts.
+
+UI\IncomeRecordsSystem_UI.lua
+    Main window, Dashboard, Projects, Characters, Reports, Help, and minimap UI.
+    It also creates shared page frames consumed by later modules.
+
+Features\IncomeRecordsSystem_Reserves.lua
+    Reserve Fund data model, calculations, history views, and Reserve UI.
+
+Features\IncomeRecordsSystem_Tools.lua
+    In-addon manual and Profit Distribution Calculator.
+
+UI\IncomeRecordsSystem_Settings.lua
+    Settings navigation, toggles, Mini Dashboard preferences, transfer settings,
+    Token settings, and font controls.
+
+UI\IncomeRecordsSystem_MiniDashboard.lua
+    Floating earnings / Projects / Reserves summary panel.
+
+UI\IncomeRecordsSystem_Resize.lua
+    Persistent resize and lock controls for the main and Mini windows.
+
+UI\IncomeRecordsSystem_PageScroll.lua
+    Outer scrolling for main tabs while preserving nested ScrollFrames.
+
+Features\IncomeRecordsSystem_Checkpoints.lua
+    Savings Project checkpoint editor.
+
+CORE DATA FLOW
+--------------
+PLAYER_MONEY
+    -> IRS:HandleMoneyChange()
+    -> internal-transfer filtering when applicable
+    -> IRS:RecordEarnings()
+    -> account and current-character period ledgers
+    -> UI refresh
+
+Positive wallet changes are income. Negative wallet changes are spending/loss.
+Transfers between owned storage are removed from the net ledger when IRS can
+match the wallet change to the corresponding storage change.
+
+TRACKED HISTORY VS. BLIZZARD STATISTICS
+---------------------------------------
+IRS-observed history is stored in the tracking and per-character period tables.
+Blizzard Wealth statistics are read separately and are used for lifetime/source
+reporting. Do not merge the two datasets or backfill lifetime values into IRS
+period history.
+
+SAVINGS PROJECTS
+----------------
+Projects store goal configuration: target, start date, deadline, funding source,
+allocation percentage, graph interval, checkpoints, and configuration history.
+
+Financial observations live in the shared source-history database rather than in
+each Project. Project history is derived by applying the Project configuration
+that was effective on each date to the matching source observation.
+
+Important entry points:
+    IRS:CreateProject()
+    IRS:UpdateProject()
+    IRS:GetProjectStats()
+    IRS:GetProjectSourceHistory()
+    IRS:GetProjectGraphData()
+    IRS:GetProjectDailyGoalStatus()
+
+RESERVE FUNDS
+-------------
+Reserves use the same shared source observations but model a balance to maintain
+rather than a dated savings target. Reserve-specific storage and calculations live
+in Features\IncomeRecordsSystem_Reserves.lua.
+
+INTERNAL TRANSFERS
+------------------
+Warband Bank movement is treated as internal storage. Guild Banks can also be
+marked as owned storage. The transfer module supports either event order and may
+briefly defer a wallet change while a Guild Bank is open so the matching bank
+update can arrive.
+
+The transfer module must stay ahead of the main UI modules in the TOC because
+Core calls its filtering hooks during live money events.
+
+PROFIT DISTRIBUTION
+-------------------
+The calculator reads positive IRS net profit since the last manual allocation
+checkpoint and suggests normalized allocations across eligible Projects and
+Reserves. Suggestions are capped at remaining need. Marking an allocation updates
+the calculator checkpoint only; it does not move gold.
+
+FONT SYSTEM
+-----------
+Main UI semantic styles:
+    helper, body, label, section, page, value, brand
+
+Mini Dashboard styles:
+    helper, body, heading, value
+
+Use IRS:GetFontSize() for displayed sizes and IRS:RegisterFontString() for text
+that should react to font-setting changes.
+
+SAVEDVARIABLES — HIGH LEVEL
+---------------------------
+IncomeRecordsSystemDB contains:
+    characters          scanned character records and per-character history
+    account             cached account-level balances/metadata
+    tracking            account-wide observed net history
+    spending            IRS-observed spending categories not supplied by Blizzard
+    guildBanks          cached Guild Bank observations
+    sourceHistory       shared funding-source observations
+    projects            Savings Project configuration
+    reserves            Reserve Fund configuration
+    internalTransfers   owned-storage settings and transfer history
+    tokenMarket         locally observed Token market data/settings
+    tools               Profit Distribution Calculator state
+    settings            account-wide user preferences
+    ui                  persistent UI state
+    migrations          completed compatibility migrations
+
+EDITING RULES
+-------------
+- Keep money values in copper until display formatting.
+- Do not count movement between owned storage as income or spending.
+- Do not fabricate historical balances when source observations do not exist.
+- Keep Project and Reserve configuration separate from shared source observations.
+- Treat SavedVariables schema changes as migrations rather than silent type/meaning
+  changes.
+- Keep large UI systems split across modules to avoid WoW Lua chunk-local limits.
+- Put reusable state/data/event infrastructure in Core, player-facing domain
+  systems in Features, and shared window/layout/presentation modules in UI.
+- Update the TOC load order when adding or moving a module with dependencies.

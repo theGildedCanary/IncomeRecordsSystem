@@ -1,0 +1,21 @@
+Copyright © 2026 Gilded Canary. All Rights Reserved.
+
+IRS — Income Records System is proprietary software.
+
+Permission is granted to download, install, and use this software for personal use with World of Warcraft.
+
+You may modify your own local copy of the software for personal use.
+
+You may not, without prior written permission from the copyright holder:
+
+- redistribute the software, in whole or in part;
+- publish or distribute modified versions of the software;
+- create and distribute derivative addons based substantially on this software;
+- repackage or re-upload the software under another name;
+- sell, sublicense, or otherwise commercially distribute the software.
+
+The source code is made publicly viewable for transparency, education, issue reporting, and potential contribution to the official project. Public availability of the source code does not place the software in the public domain or grant permission to redistribute it.
+
+World of Warcraft and related names and trademarks are property of Blizzard Entertainment, Inc. This project is not affiliated with or endorsed by Blizzard Entertainment.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.

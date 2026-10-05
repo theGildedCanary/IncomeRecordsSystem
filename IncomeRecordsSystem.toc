@@ -1,0 +1,30 @@
+## Interface: 120100
+## Title: IRS — Income Records System
+## Notes: IRS-themed account-wide gold earnings ledger for World of Warcraft Retail.
+## Author: Gilded Canary
+## Version: 0.17.3
+## IconTexture: Interface\AddOns\IncomeRecordsSystem\Media\IRSButton
+## SavedVariables: IncomeRecordsSystemDB
+
+# Core framework and data model
+Core\IncomeRecordsSystem_Core.lua
+
+# Feature modules that must exist before the main UI is built
+Features\IncomeRecordsSystem_Transfers.lua
+Features\IncomeRecordsSystem_TokenMarket.lua
+
+# Main UI creates the shared page frames used by later feature/UI modules
+UI\IncomeRecordsSystem_UI.lua
+
+# Feature interfaces and domain systems
+Features\IncomeRecordsSystem_Reserves.lua
+Features\IncomeRecordsSystem_Tools.lua
+
+# Supporting UI modules
+UI\IncomeRecordsSystem_Settings.lua
+UI\IncomeRecordsSystem_MiniDashboard.lua
+UI\IncomeRecordsSystem_Resize.lua
+UI\IncomeRecordsSystem_PageScroll.lua
+
+# Savings Project checkpoint editor depends on the main UI/project frames
+Features\IncomeRecordsSystem_Checkpoints.lua
