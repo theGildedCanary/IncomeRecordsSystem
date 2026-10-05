@@ -14,6 +14,17 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 
 ### Removed
 
+
+
+## [1.0.0] - 2026-10-05
+
+### Changed
+
+- Declared IRS — Income Records System stable for its first major public release.
+- Added project documentation, issue reporting, validation, and automated release packaging infrastructure.
+
+
+
 ## [0.17.3] - 2026-10-05
 
 ### Added
@@ -29,5 +40,6 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 - Profit Distribution Calculator.
 - Character, report, settings, and diagnostic tools.
 
-[Unreleased]: https://github.com/theGildedCanary/IncomeRecordsSystem/compare/v0.17.3...HEAD
+[Unreleased]: https://github.com/theGildedCanary/IncomeRecordsSystem/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/theGildedCanary/IncomeRecordsSystem/compare/v0.17.3...v1.0.0
 [0.17.3]: https://github.com/theGildedCanary/IncomeRecordsSystem/releases/tag/v0.17.3
