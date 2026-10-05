@@ -1,0 +1,77 @@
+name: Bug Report
+description: Report something in IRS that is not working correctly.
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem with IRS. Please provide enough detail to reproduce it. Remove any private information from screenshots, logs, or error messages before posting.
+
+  - type: input
+    id: irs-version
+    attributes:
+      label: IRS version
+      description: The addon version shown in the TOC or release you installed.
+      placeholder: "0.17.3"
+    validations:
+      required: true
+
+  - type: input
+    id: wow-version
+    attributes:
+      label: World of Warcraft Retail version
+      placeholder: "12.1.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the problem as clearly as possible.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the actions that reliably cause the problem.
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. Move ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: errors
+    attributes:
+      label: Lua errors or diagnostic output
+      description: Paste any relevant Lua error, BugSack output, or /irs debug information. Remove private information first.
+      render: text
+
+  - type: textarea
+    id: addons
+    attributes:
+      label: Other addon information
+      description: If relevant, note whether the issue still occurs with other addons disabled.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I am using World of Warcraft Retail.
+          required: true
+        - label: I checked that I am reporting against the current IRS release.
+          required: true
+        - label: I removed private information from anything I am posting publicly.
+          required: true

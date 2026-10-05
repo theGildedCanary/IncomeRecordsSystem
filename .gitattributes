@@ -1,2 +1,10 @@
-# Auto detect text files and perform LF normalization
+# Normalize repository text files to LF.
 * text=auto
+
+*.lua text eol=lf
+*.toc text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+*.txt text eol=lf
