@@ -3499,13 +3499,15 @@ eventFrame:RegisterEvent("TRANSMOGRIFY_SUCCESS")
 eventFrame:RegisterEvent("TRANSMOGRIFY_CLOSE")
 
 local scanGeneration = 0
+local loginScanPending = false
+
 -- Debounces delayed full scans. WoW often updates related APIs a fraction of a
 -- second after an event fires, so IRS waits briefly before reading them.
 local function QueueScan(delay)
     scanGeneration = scanGeneration + 1
     local generation = scanGeneration
     C_Timer.After(delay or 0.25, function()
-        if generation == scanGeneration and IRS.db then
+        if generation == scanGeneration and IRS.db and not loginScanPending then
             IRS:ScanCurrentCharacter()
         end
     end)
@@ -3523,7 +3525,7 @@ local function QueueMoneyScans()
     moneyScanGeneration = moneyScanGeneration + 1
     local generation = moneyScanGeneration
     C_Timer.After(1.00, function()
-        if generation == moneyScanGeneration and IRS.db then
+        if generation == moneyScanGeneration and IRS.db and not loginScanPending then
             IRS:ScanCurrentCharacter()
         end
     end)
@@ -3541,7 +3543,16 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 
     if event == "PLAYER_LOGIN" then
         IRS:ScheduleStartupTimingFinish(4.0)
-        QueueScan(1.0)
+        loginScanPending = true
+
+        -- The initial login scan must not be canceled or postponed by the burst
+        -- of CRITERIA_UPDATE and other startup events some characters receive.
+        C_Timer.After(1.0, function()
+            if IRS.db then
+                IRS:ScanCurrentCharacter()
+            end
+            loginScanPending = false
+        end)
     elseif event == "BANKFRAME_OPENED" or event == "PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED" then
         IRS:ScanWarbandGold()
         QueueScan(0.2)

@@ -90,6 +90,20 @@ Every money/stat-related event in a login burst could therefore create its own d
 
 This preserves the intended two-read behavior while preventing hundreds of stale delayed scans from executing.
 
+### Follow-up Diagnostic Result — Mythaelias After Delayed-Scan Debounce
+
+After the delayed money-scan debounce was added, Mythaelias no longer produced a scan storm. However, the next startup timing report contained **no completed character scan at all** during the four-second diagnostic window.
+
+The reason is that the initial login scan still used the same generation-based `QueueScan()` path as ordinary event-driven scans. A sufficiently long burst of startup events could continuously advance the generation counter and invalidate the login scan before it ran.
+
+The login scan is now separated from the normal debounce path:
+
+- `PLAYER_LOGIN` schedules one guaranteed scan after one second;
+- ordinary queued scans are temporarily suppressed while that login scan is pending;
+- after the guaranteed login scan completes, normal event-driven debounce behavior resumes.
+
+This prevents startup event bursts from either multiplying the login scan or starving it entirely.
+
 ### Current Diagnostic Step
 
 Temporary lightweight startup timing instrumentation is now active.
