@@ -177,7 +177,7 @@ miniDashboard:SetBackdropBorderColor(0.52, 0.39, 0.22, 1)
 miniDashboard:Hide()
 IRS.miniDashboardFrame = miniDashboard
 
--- miniDashboard persistence
+-- Saves whether the floating Mini Dashboard was open for the active character.
 local function SaveMiniDashboardOpenState(isOpen)
     if not IRS.db then
         IRS:EnsureDB()
@@ -973,5 +973,39 @@ function IRS:ToggleMiniDashboard()
         IRS:ShowMiniDashboard()
     end
 end
+
+local function RestoreMiniDashboardOpenState()
+    if not IRS.db then
+        IRS:EnsureDB()
+    end
+
+    local savedStates = IRS.db.ui
+        and IRS.db.ui.miniDashboard
+        and IRS.db.ui.miniDashboard.characterOpenState
+    
+    local characterKey = IRS:CharacterKey()
+
+    if savedStates and savedStates[characterKey] == true then
+        IRS:ShowMiniDashboard()
+    else
+        miniDashboard:Hide()
+    end
+end
+
+local persistenceFrame = CreateFrame("Frame")
+persistenceFrame:RegisterEvent("PLAYER_LOGIN")
+persistenceFrame:RegisterEvent("PLAYER_LOGOUT")
+
+persistenceFrame:SetScript("OnEvent", function(_, event)
+    if event == "PLAYER_LOGIN" then
+        C_Timer.After(3.0, function()
+            if IRS.db then
+                RestoreMiniDashboardOpenState()
+            end
+        end)
+    elseif event == "PLAYER_LOGOUT" then
+        SaveMiniDashboardOpenState(miniDashboard:IsShown())
+    end
+end)
 
 IRS:EndStartupTiming(_irsStartupModuleTiming)
