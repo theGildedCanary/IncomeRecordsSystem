@@ -71,6 +71,25 @@ The debounce condition has been corrected to:
 
 This means only the newest queued scan is allowed to execute. The timing instrumentation remains active temporarily so the fix can be verified on subsequent logins before the diagnostics are removed.
 
+### Follow-up Diagnostic Result — Mythaelias
+
+A subsequent login on Mythaelias still produced **558 full character scans** despite the corrected `QueueScan()` comparison.
+
+That report showed:
+
+- `Character scan`: 558 calls, 19887.41 ms total
+- `Master UI refresh`: 558 calls, 19299.13 ms total
+- `UI: Page scroll refresh`: 558 calls, 13219.32 ms total
+- startup timing window still active because the UI event loop was saturated by queued scans
+
+Inspection of `QueueMoneyScans()` found a second independent cause. Its one-second follow-up used a direct `C_Timer.After()` callback that called `IRS:ScanCurrentCharacter()` without any debounce or generation check.
+
+Every money/stat-related event in a login burst could therefore create its own delayed full scan even after `QueueScan()` itself had been corrected.
+
+`QueueMoneyScans()` now has its own generation counter. The normal early scan still uses `QueueScan(0.20)`, and the delayed one-second follow-up now runs only when it belongs to the newest money-event burst.
+
+This preserves the intended two-read behavior while preventing hundreds of stale delayed scans from executing.
+
 ### Current Diagnostic Step
 
 Temporary lightweight startup timing instrumentation is now active.

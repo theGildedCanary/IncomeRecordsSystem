@@ -3513,12 +3513,19 @@ end
 
 -- Schedules two source-stat scans after money-related activity. The second scan
 -- catches Blizzard statistics that lag slightly behind the wallet update.
+-- Bursts are debounced so only the newest pair of scans is allowed to run.
+local moneyScanGeneration = 0
 local function QueueMoneyScans()
     -- The Statistics counters can trail the wallet event slightly. Two reads
     -- make the tracker resilient without continuously polling the client.
     QueueScan(0.20)
+
+    moneyScanGeneration = moneyScanGeneration + 1
+    local generation = moneyScanGeneration
     C_Timer.After(1.00, function()
-        if IRS.db then IRS:ScanCurrentCharacter() end
+        if generation == moneyScanGeneration and IRS.db then
+            IRS:ScanCurrentCharacter()
+        end
     end)
 end
 
