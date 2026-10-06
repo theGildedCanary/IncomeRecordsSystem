@@ -333,7 +333,7 @@ miniHeaderTitle:SetText("IRS MINI DASHBOARD")
 
 local miniHeaderSub = MakeText(miniHeader, 8, COLORS.muted, "LEFT")
 miniHeaderSub:SetPoint("TOPLEFT", miniHeaderTitle, "BOTTOMLEFT", 0, -1)
-miniHeaderSub:SetText("ACCOUNT NET")
+miniHeaderSub:SetText("NET GOLD")
 
 local miniClose = CreateFrame("Button", nil, miniDashboard, "UIPanelCloseButton")
 miniClose:SetPoint("TOPRIGHT", -3, -3)
@@ -345,17 +345,18 @@ miniClose:SetPoint("TOPRIGHT", -3, -3)
 local miniPeriods = MakePanel(miniDashboard, COLORS.softFill)
 miniPeriods:SetPoint("TOPLEFT", 9, -47)
 miniPeriods:SetPoint("TOPRIGHT", -9, -47)
-miniPeriods:SetHeight(104)
+miniPeriods:SetHeight(127)
 miniPeriods:SetBackdropBorderColor(0, 0, 0, 0)
 miniPeriods.topLine = AddDivider(miniPeriods, "TOPLEFT", "TOPLEFT", 0, 0, 0.9)
 miniPeriods.bottomLine = AddDivider(miniPeriods, "BOTTOMLEFT", "BOTTOMLEFT", 0, 0, 0.9)
 
 local miniPeriodRows = {}
 local miniPeriodLabels = {
-    {"Today", "today"},
-    {"This Week", "week"},
-    {"This Month", "month"},
-    {"Total Recorded", "total"},
+    {"Character Today", "today", "character"},
+    {"Today", "today", "account"},
+    {"This Week", "week", "account"},
+    {"This Month", "month", "account"},
+    {"Total Recorded", "total", "account"},
 }
 
 for i, info in ipairs(miniPeriodLabels) do
@@ -374,6 +375,8 @@ for i, info in ipairs(miniPeriodLabels) do
     row.value:SetText("0g")
 
     row.key = info[2]
+    row.scope = info[3]
+
     if i < #miniPeriodLabels then
         row.divider = row:CreateTexture(nil, "BORDER")
         row.divider:SetTexture("Interface/Buttons/WHITE8X8")
@@ -624,9 +627,17 @@ function IRS:RefreshMiniDashboard()
     if not IRS.db then return end
 
     local earnings = IRS:GetCurrentEarnings()
+    local characterEarnings = IRS:GetCharacterEarnings()
+    local characterName = UnitName("player") or "Character"
 
     for _, row in ipairs(miniPeriodRows) do
-        local amount = earnings[row.key] or 0
+        if row.scope == "character" then
+            row.label:SetText(characterName .. "'s Net Today")
+        end
+
+        local source = row.scope == "character" and characterEarnings or earnings
+        local amount = source[row.key] or 0
+
         row.value:SetText(FormatGold(amount, true))
         SetNetColor(row.value, amount, COLORS.goldSoft)
     end
