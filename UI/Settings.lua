@@ -586,16 +586,28 @@ local function LayoutSettingsForFonts()
     end
 
     -- General toggle panel.
+    local toggleRowHeight = math.max(58, labelSize + helper + 38)
+
     togglePanel:ClearAllPoints()
     togglePanel:SetPoint("TOPLEFT", togglesDesc, "BOTTOMLEFT", -2, -16)
     togglePanel:SetPoint("TOPRIGHT", toggles, "TOPRIGHT", -14, 0)
-    togglePanel:SetHeight(math.max(86, labelSize + helper + 42))
+    togglePanel:SetHeight(math.max(144, (toggleRowHeight * 2) + 28))
 
     minimapLabel:ClearAllPoints()
     minimapLabel:SetPoint("TOPLEFT", minimapCheck, "TOPRIGHT", 8, -1)
     minimapDesc:ClearAllPoints()
     minimapDesc:SetPoint("TOPLEFT", minimapLabel, "BOTTOMLEFT", 0, -6)
     minimapDesc:SetPoint("RIGHT", -12, 0)
+
+    miniAutoOpenCheck:ClearAllPoints()
+    miniAutoOpenCheck:SetPoint("TOPLEFT", 14, -(18 + toggleRowHeight))
+
+    miniAutoOpenLabel:ClearAllPoints()
+    miniAutoOpenLabel:SetPoint("TOPLEFT", miniAutoOpenCheck, "TOPRIGHT", 8, -1)
+
+    miniAutoOpenDesc:ClearAllPoints()
+    miniAutoOpenDesc:SetPoint("TOPLEFT", miniAutoOpenLabel, "BOTTOMLEFT", 0, -6)
+    miniAutoOpenDesc:SetPoint("RIGHT", -12, 0)
 
     -- Mini Dashboard section.
     miniTogglePanel:ClearAllPoints()
