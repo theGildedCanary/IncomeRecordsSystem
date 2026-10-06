@@ -12,6 +12,171 @@ local IRS = IRS
 IRS.version = "0.17.3"
 
 -- ============================================================================
+-- TEMPORARY STARTUP TIMING DIAGNOSTICS
+-- Runtime-only instrumentation for the intermittent login execution timeout.
+-- Nothing in this block is written to IncomeRecordsSystemDB.
+-- Remove this block and the Begin/End calls once the culprit is identified.
+-- ============================================================================
+local function StartupTimingNowMS()
+    if debugprofilestop then
+        return debugprofilestop()
+    end
+
+    local seconds = 0
+    if GetTimePreciseSec then
+        seconds = GetTimePreciseSec()
+    elseif GetTime then
+        seconds = GetTime()
+    end
+    return seconds * 1000
+end
+
+IRS._startupTiming = {
+    active = true,
+    startedAt = StartupTimingNowMS(),
+    stages = {},
+    order = {},
+    tokens = {},
+    nextTokenId = 0,
+}
+
+function IRS:BeginStartupTiming(label)
+    local timing = IRS._startupTiming
+    if not timing or not timing.active then return nil end
+
+    timing.nextTokenId = timing.nextTokenId + 1
+    local token = {
+        id = timing.nextTokenId,
+        label = tostring(label or "Unnamed startup stage"),
+        startedAt = StartupTimingNowMS(),
+        active = true,
+    }
+    timing.tokens[token.id] = token
+
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0.75, function()
+            local current = IRS._startupTiming
+            local pending = current
+                and current.tokens
+                and current.tokens[token.id]
+
+            if pending and pending.active then
+                print(string.format(
+                    "|cffff9f43IRS startup diagnostic:|r '%s' did not complete before the watchdog. Run |cffffffff/irs timing|r after the error.",
+                    pending.label
+                ))
+            end
+        end)
+    end
+
+    return token
+end
+
+function IRS:EndStartupTiming(token)
+    if not token or not token.active then return nil end
+
+    token.active = false
+    local elapsed = math.max(0, StartupTimingNowMS() - token.startedAt)
+    local timing = IRS._startupTiming
+    if not timing then return elapsed end
+
+    if timing.tokens then
+        timing.tokens[token.id] = nil
+    end
+
+    local stage = timing.stages[token.label]
+    if not stage then
+        stage = {
+            count = 0,
+            total = 0,
+            max = 0,
+        }
+        timing.stages[token.label] = stage
+        table.insert(timing.order, token.label)
+    end
+
+    stage.count = stage.count + 1
+    stage.total = stage.total + elapsed
+    stage.max = math.max(stage.max, elapsed)
+
+    return elapsed
+end
+
+function IRS:FinishStartupTiming()
+    local timing = IRS._startupTiming
+    if not timing or not timing.active then return end
+
+    timing.active = false
+    timing.finishedAt = StartupTimingNowMS()
+end
+
+function IRS:ScheduleStartupTimingFinish(delay)
+    local timing = IRS._startupTiming
+    if not timing or timing.finishScheduled then return end
+
+    timing.finishScheduled = true
+    if C_Timer and C_Timer.After then
+        C_Timer.After(delay or 4.0, function()
+            IRS:FinishStartupTiming()
+        end)
+    end
+end
+
+function IRS:PrintStartupTiming()
+    local timing = IRS._startupTiming
+    if not timing then
+        print("|cff46d9ffIRS startup timing:|r no timing data is available.")
+        return
+    end
+
+    print("|cff46d9ffIRS startup timing|r — runtime only; SavedVariables are untouched.")
+
+    if #timing.order == 0 then
+        print("  No completed startup stages have been recorded yet.")
+    else
+        for _, label in ipairs(timing.order) do
+            local stage = timing.stages[label]
+            if stage.count > 1 then
+                print(string.format(
+                    "  %s — %.2f ms total (%d calls, %.2f ms max)",
+                    label,
+                    stage.total,
+                    stage.count,
+                    stage.max
+                ))
+            else
+                print(string.format(
+                    "  %s — %.2f ms",
+                    label,
+                    stage.total
+                ))
+            end
+        end
+    end
+
+    local incomplete = 0
+    for _, token in pairs(timing.tokens or {}) do
+        if token.active then
+            incomplete = incomplete + 1
+            print(string.format(
+                "  |cffff5555INCOMPLETE|r — %s (%.2f ms since start)",
+                token.label,
+                math.max(0, StartupTimingNowMS() - token.startedAt)
+            ))
+        end
+    end
+
+    if incomplete == 0 then
+        print(timing.active
+            and "  Startup timing window is still active."
+            or "  Startup timing window is complete.")
+    end
+end
+
+local _irsCoreModuleTiming = IRS:BeginStartupTiming("Module load: Core")
+
+
+-- ============================================================================
 -- FONT STYLES
 -- ============================================================================
 -- Semantic font groups shared by the Settings editor.
@@ -382,6 +547,8 @@ end
 -- ============================================================================
 -- Initializes the database and applies compatible SavedVariables migrations.
 function IRS:EnsureDB()
+    local startupTiming = IRS:BeginStartupTiming("Database initialization / migration")
+
     IncomeRecordsSystemDB = IncomeRecordsSystemDB or {}
     local db = IncomeRecordsSystemDB
     local now = ServerNow()
@@ -661,6 +828,8 @@ function IRS:EnsureDB()
 
         db.migrations.projectSourceModelRestored111 = now
     end
+
+    IRS:EndStartupTiming(startupTiming)
 end
 
 -- ============================================================================
@@ -1042,6 +1211,8 @@ end
 -- Refreshes the cached Warband Bank balance and then updates savings projects
 -- that depend on that balance.
 function IRS:ScanWarbandGold()
+    local startupTiming = IRS:BeginStartupTiming("Warband Bank scan")
+
     if not IRS.db then IRS:EnsureDB() end
     local amount = FetchWarbandGold()
     if amount ~= nil then
@@ -1063,14 +1234,19 @@ function IRS:ScanWarbandGold()
         IRS.db.account.warbandGoldSeen = true
         IRS:UpdateProjectSnapshots()
     end
+
+    IRS:EndStartupTiming(startupTiming)
 end
 
 -- FULL CHARACTER REFRESH.
 -- Updates identity, wallet, Blizzard Wealth statistics, Warband Bank cache,
 -- project snapshots, and finally the UI. /irs scan calls this directly.
 function IRS:ScanCurrentCharacter()
+    local scanTiming = IRS:BeginStartupTiming("Character scan")
+
     if not IRS.db then IRS:EnsureDB() end
 
+    local identityTiming = IRS:BeginStartupTiming("Character scan: identity / wallet")
     local key = IRS:CharacterKey()
     local record = IRS.db.characters[key] or {}
     IRS.db.characters[key] = record
@@ -1114,7 +1290,9 @@ function IRS:ScanCurrentCharacter()
     else
         record.money = currentMoney
     end
+    IRS:EndStartupTiming(identityTiming)
 
+    local statisticsTiming = IRS:BeginStartupTiming("Character scan: Blizzard statistics")
     local currentStats = {}
     for statName, id in pairs(IRS.STAT_IDS) do
         local value = ReadStatistic(statName, id)
@@ -1126,16 +1304,23 @@ function IRS:ScanCurrentCharacter()
     for statName, value in pairs(currentStats) do
         record.stats[statName] = value
     end
+    IRS:EndStartupTiming(statisticsTiming)
 
     IRS:ScanWarbandGold()
+
+    local totalsTiming = IRS:BeginStartupTiming("Character scan: account totals")
     local totals = IRS:GetTotals()
     if totals.knownWealth > (IRS.db.account.peakKnownWealth or 0) then
         IRS.db.account.peakKnownWealth = totals.knownWealth
     end
+    IRS:EndStartupTiming(totalsTiming)
+
     IRS.db.account.lastScan = ServerNow()
     IRS:UpdateProjectSnapshots()
 
     if IRS.RefreshUI then IRS:RefreshUI() end
+
+    IRS:EndStartupTiming(scanTiming)
 end
 
 -- Aggregates the latest Blizzard lifetime statistics across TRACKED characters.
@@ -2205,9 +2390,13 @@ end
 
 -- Refreshes IRS shared source-history observations.
 function IRS:UpdateProjectSnapshots()
+    local startupTiming = IRS:BeginStartupTiming("Project snapshot update")
+
     if not IRS.db then IRS:EnsureDB() end
     IRS:EnsureProjectSourceHistoryMigration()
     IRS:CaptureDailySourceHistory()
+
+    IRS:EndStartupTiming(startupTiming)
 end
 
 -- Validates form data, creates a persistent project, and records its opening
@@ -3336,11 +3525,15 @@ end
 eventFrame:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
         IRS:EnsureDB()
+
+        local minimapTiming = IRS:BeginStartupTiming("Minimap button refresh")
         if IRS.RefreshMinimapButton then IRS:RefreshMinimapButton() end
+        IRS:EndStartupTiming(minimapTiming)
         return
     end
 
     if event == "PLAYER_LOGIN" then
+        IRS:ScheduleStartupTimingFinish(4.0)
         QueueScan(1.0)
     elseif event == "BANKFRAME_OPENED" or event == "PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED" then
         IRS:ScanWarbandGold()
@@ -3449,6 +3642,8 @@ SlashCmdList.INCOMERECORDSSYSTEM = function(msg)
         if IRS.ShowUI then IRS:ShowUI("reports") end
     elseif msg == "settings" or msg == "options" then
         if IRS.ShowUI then IRS:ShowUI("settings") end
+    elseif msg == "timing" or msg == "startup" then
+        IRS:PrintStartupTiming()
     elseif msg == "debug" then
         local key = IRS:CharacterKey()
         local record = IRS.db and IRS.db.characters and IRS.db.characters[key]
@@ -3490,3 +3685,5 @@ SlashCmdList.INCOMERECORDSSYSTEM = function(msg)
         if IRS.ShowUI then IRS:ShowUI("help") end
     end
 end
+
+IRS:EndStartupTiming(_irsCoreModuleTiming)

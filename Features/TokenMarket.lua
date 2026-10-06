@@ -4,6 +4,7 @@ Stores locally observed Token prices and manages configured buy/sell alerts.
 ]]
 
 local IRS = IRS
+local _irsStartupModuleTiming = IRS:BeginStartupTiming("Module load: Token Market")
 
 local COLORS = {
     panel = {0.190, 0.145, 0.098, 0.980},
@@ -835,17 +836,26 @@ frame:RegisterEvent("TOKEN_MARKET_PRICE_UPDATED")
 frame:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" then
         if arg1 ~= "IncomeRecordsSystem" then return end
+
+        local startupTiming = IRS:BeginStartupTiming("Token Market startup")
         IRS:EnsureTokenMarketDB()
         ScheduleNext()
+        IRS:EndStartupTiming(startupTiming)
         return
     end
 
     if event == "PLAYER_LOGIN" then
         C_Timer.After(2.0, function()
-            if IRS.db then IRS:RequestTokenMarketPrice() end
+            if IRS.db then
+                local startupTiming = IRS:BeginStartupTiming("Token Market price request")
+                IRS:RequestTokenMarketPrice()
+                IRS:EndStartupTiming(startupTiming)
+            end
         end)
     elseif event == "TOKEN_MARKET_PRICE_UPDATED" then
         IRS:CaptureTokenMarketPrice()
     end
 end)
 
+
+IRS:EndStartupTiming(_irsStartupModuleTiming)

@@ -5,6 +5,7 @@ Supporting interfaces are split into their own modules.
 ]]
 
 local IRS = IRS
+local _irsStartupModuleTiming = IRS:BeginStartupTiming("Main UI initialization / module load")
 
 -- Central visual palette. Change colors here instead of hunting through the UI.
 -- Values are RGBA (red, green, blue, alpha), each from 0.0 to 1.0.
@@ -2351,12 +2352,19 @@ end
 function IRS:RefreshUI()
     if not IRS.db then return end
 
+    local refreshTiming = IRS:BeginStartupTiming("Master UI refresh")
+
+    local stageTiming = IRS:BeginStartupTiming("UI: Page scroll preparation")
     if IRS.PreparePageScroll then
         IRS:PreparePageScroll()
     end
+    IRS:EndStartupTiming(stageTiming)
 
+    stageTiming = IRS:BeginStartupTiming("UI: Main layout refresh")
     IRS:RefreshMainFontLayout()
+    IRS:EndStartupTiming(stageTiming)
 
+    local dashboardTiming = IRS:BeginStartupTiming("Dashboard refresh")
     local totals = IRS:GetTotals()
     local earnings = IRS:GetCurrentEarnings()
     local current = IRS.db.characters[IRS:CharacterKey()]
@@ -2426,24 +2434,52 @@ function IRS:RefreshUI()
     right.rows[5]:SetText(totals.warbandGoldSeen and FormatGold(totals.warbandGold or 0, true) or "Unavailable")
 
     if IRS.RefreshTokenDashboardCard then
+        local tokenTiming = IRS:BeginStartupTiming("Token dashboard refresh")
         IRS:RefreshTokenDashboardCard()
+        IRS:EndStartupTiming(tokenTiming)
     end
 
     local updated = IRS.db.account.lastScan
     lastUpdated:SetText("Last Updated\n" .. (updated and date("%b %d, %Y  %I:%M %p", updated) or "—"))
 
     RefreshChart()
-    IRS:RefreshProjectsPage(true)
-    if IRS.RefreshReservesPage then IRS:RefreshReservesPage(true) end
-    if IRS.RefreshToolsPage then IRS:RefreshToolsPage() end
-    IRS:RefreshCharacterPage()
-    IRS:RefreshReportsPage()
-    IRS:RefreshSettingsPage()
-    if IRS.RefreshMiniDashboard then IRS:RefreshMiniDashboard() end
+    IRS:EndStartupTiming(dashboardTiming)
 
+    stageTiming = IRS:BeginStartupTiming("Projects refresh")
+    IRS:RefreshProjectsPage(true)
+    IRS:EndStartupTiming(stageTiming)
+
+    stageTiming = IRS:BeginStartupTiming("Reserves refresh")
+    if IRS.RefreshReservesPage then IRS:RefreshReservesPage(true) end
+    IRS:EndStartupTiming(stageTiming)
+
+    stageTiming = IRS:BeginStartupTiming("Tools refresh")
+    if IRS.RefreshToolsPage then IRS:RefreshToolsPage() end
+    IRS:EndStartupTiming(stageTiming)
+
+    stageTiming = IRS:BeginStartupTiming("Characters refresh")
+    IRS:RefreshCharacterPage()
+    IRS:EndStartupTiming(stageTiming)
+
+    stageTiming = IRS:BeginStartupTiming("Reports refresh")
+    IRS:RefreshReportsPage()
+    IRS:EndStartupTiming(stageTiming)
+
+    stageTiming = IRS:BeginStartupTiming("Settings refresh")
+    IRS:RefreshSettingsPage()
+    IRS:EndStartupTiming(stageTiming)
+
+    stageTiming = IRS:BeginStartupTiming("Mini Dashboard refresh")
+    if IRS.RefreshMiniDashboard then IRS:RefreshMiniDashboard() end
+    IRS:EndStartupTiming(stageTiming)
+
+    stageTiming = IRS:BeginStartupTiming("UI: Page scroll refresh")
     if IRS.RefreshPageScroll then
         IRS:RefreshPageScroll(activeTab)
     end
+    IRS:EndStartupTiming(stageTiming)
+
+    IRS:EndStartupTiming(refreshTiming)
 end
 
 -- Shows one page, hides the others, updates sidebar active-state artwork, and
@@ -2557,3 +2593,5 @@ function IRS:RefreshMinimapButton()
 end
 
 IRS:SelectTab("dashboard")
+
+IRS:EndStartupTiming(_irsStartupModuleTiming)

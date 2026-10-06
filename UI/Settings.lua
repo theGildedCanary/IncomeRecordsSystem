@@ -7,6 +7,8 @@ local IRS = IRS
 local page = IRS.settingsPage
 if not page then return end
 
+local _irsStartupModuleTiming = IRS:BeginStartupTiming("Settings UI initialization / module load")
+
 local COLORS = {
     panel = {0.190, 0.145, 0.098, 0.980},
     panelAlt = {0.225, 0.170, 0.112, 0.985},
@@ -757,3 +759,5 @@ IRS:SelectSettingsSection(
     and IRS.db.ui.settingsSection
     or "toggles"
 )
+
+IRS:EndStartupTiming(_irsStartupModuleTiming)

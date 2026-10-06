@@ -4,6 +4,7 @@ Persistent reserve goals backed by IRS source-history observations.
 ]]
 
 local IRS = IRS
+local _irsStartupModuleTiming = IRS:BeginStartupTiming("Module load: Reserves")
 
 local COLORS = {
     panel = {0.190, 0.145, 0.098, 0.88},
@@ -1099,12 +1100,19 @@ IRS:RefreshReservesPage(false)
     return true
 end
 
+local function BuildReservesUIForStartup()
+    local startupTiming = IRS:BeginStartupTiming("Reserves UI initialization")
+    local built = BuildReservesUI()
+    IRS:EndStartupTiming(startupTiming)
+    return built
+end
+
 local reservesInitFrame = CreateFrame("Frame")
 reservesInitFrame:RegisterEvent("ADDON_LOADED")
 reservesInitFrame:RegisterEvent("PLAYER_LOGIN")
 reservesInitFrame:SetScript("OnEvent", function(self, event, addonName)
     if event == "ADDON_LOADED" and addonName ~= "IncomeRecordsSystem" then return end
-    if BuildReservesUI() then
+    if BuildReservesUIForStartup() then
         self:UnregisterAllEvents()
     end
 end)
@@ -1112,5 +1120,7 @@ end)
 -- A zero-delay retry also handles reloads where page geometry becomes available
 -- on the next UI tick. BuildReservesUI is idempotent.
 if C_Timer and C_Timer.After then
-    C_Timer.After(0, BuildReservesUI)
+    C_Timer.After(0, BuildReservesUIForStartup)
 end
+
+IRS:EndStartupTiming(_irsStartupModuleTiming)

@@ -4,6 +4,7 @@ Creates and refreshes the movable summary panel for earnings, Projects, and Rese
 ]]
 
 local IRS = IRS
+local _irsStartupModuleTiming = IRS:BeginStartupTiming("Mini Dashboard initialization / module load")
 
 -- Mini-dashboard-only visual palette.
 local COLORS = {
@@ -972,3 +973,5 @@ function IRS:ToggleMiniDashboard()
         IRS:ShowMiniDashboard()
     end
 end
+
+IRS:EndStartupTiming(_irsStartupModuleTiming)

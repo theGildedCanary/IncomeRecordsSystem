@@ -4,6 +4,7 @@ In-addon manual and Profit Distribution Calculator.
 ]]
 
 local IRS = IRS
+local _irsStartupModuleTiming = IRS:BeginStartupTiming("Module load: Tools")
 
 local COLORS = {
     panel = {0.190, 0.145, 0.098, 0.88},
@@ -800,12 +801,19 @@ IRS:RefreshToolsPage()
     return true
 end
 
+local function BuildToolsUIForStartup()
+    local startupTiming = IRS:BeginStartupTiming("Tools UI initialization")
+    local built = BuildToolsUI()
+    IRS:EndStartupTiming(startupTiming)
+    return built
+end
+
 local toolsInitFrame = CreateFrame("Frame")
 toolsInitFrame:RegisterEvent("ADDON_LOADED")
 toolsInitFrame:RegisterEvent("PLAYER_LOGIN")
 toolsInitFrame:SetScript("OnEvent", function(self, event, addonName)
     if event == "ADDON_LOADED" and addonName ~= "IncomeRecordsSystem" then return end
-    if BuildToolsUI() then
+    if BuildToolsUIForStartup() then
         self:UnregisterAllEvents()
     end
 end)
@@ -813,5 +821,7 @@ end)
 -- A zero-delay retry also handles reloads where page geometry becomes available
 -- on the next UI tick. BuildToolsUI is idempotent.
 if C_Timer and C_Timer.After then
-    C_Timer.After(0, BuildToolsUI)
+    C_Timer.After(0, BuildToolsUIForStartup)
 end
+
+IRS:EndStartupTiming(_irsStartupModuleTiming)
