@@ -7,27 +7,27 @@
 ## SavedVariables: IncomeRecordsSystemDB
 
 # Core framework and data model
-Core\IncomeRecordsSystem_Core.lua
+Core\Core.lua
 
 # Feature modules that must exist before the main UI is built
-Features\IncomeRecordsSystem_Transfers.lua
-Features\IncomeRecordsSystem_TokenMarket.lua
+Features\Transfers.lua
+Features\TokenMarket.lua
 
 # Main UI creates the shared page frames used by later feature/UI modules
-UI\IncomeRecordsSystem_UI.lua
+UI\UI.lua
 
 # Blizzard AddOns Options integration
-UI\IncomeRecordsSystem_AddonOptions.lua
+UI\AddonOptions.lua
 
 # Feature interfaces and domain systems
-Features\IncomeRecordsSystem_Reserves.lua
-Features\IncomeRecordsSystem_Tools.lua
+Features\Reserves.lua
+Features\Tools.lua
 
 # Supporting UI modules
-UI\IncomeRecordsSystem_Settings.lua
-UI\IncomeRecordsSystem_MiniDashboard.lua
-UI\IncomeRecordsSystem_Resize.lua
-UI\IncomeRecordsSystem_PageScroll.lua
+UI\Settings.lua
+UI\MiniDashboard.lua
+UI\Resize.lua
+UI\PageScroll.lua
 
 # Savings Project checkpoint editor depends on the main UI/project frames
-Features\IncomeRecordsSystem_Checkpoints.lua
+Features\Checkpoints.lua

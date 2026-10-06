@@ -451,6 +451,7 @@ function IRS:EnsureDB()
     -- financial ledgers.
     db.ui = db.ui or {}
     db.ui.miniDashboard = db.ui.miniDashboard or {}
+    db.ui.miniDashboard.characterOpenState = db.ui.miniDashboard.characterOpenState or {}
 
     -- Last Settings sub-page selected in the Settings sidebar.
     db.ui.settingsSection = db.ui.settingsSection or "toggles"

@@ -176,6 +176,20 @@ miniDashboard:SetBackdropBorderColor(0.52, 0.39, 0.22, 1)
 miniDashboard:Hide()
 IRS.miniDashboardFrame = miniDashboard
 
+-- miniDashboard persistence
+local function SaveMiniDashboardOpenState(isOpen)
+    if not IRS.db then
+        IRS:EnsureDB()
+    end
+
+    IRS.db.ui = IRS.db.ui or {}
+    IRS.db.ui.miniDashboard = IRS.db.ui.miniDashboard or {}
+    IRS.db.ui.miniDashboard.characterOpenState = IRS.db.ui.miniDashboard.characterOpenState or {}
+
+    local characterKey = IRS:CharacterKey()
+    IRS.db.ui.miniDashboard.characterOpenState[characterKey] = isOpen == true
+end
+
 -- Converts the panel to the player's selected corner anchor while preserving
 -- its exact current on-screen position.
 --
