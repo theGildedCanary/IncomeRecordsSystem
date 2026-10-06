@@ -16,6 +16,9 @@ Features\IncomeRecordsSystem_TokenMarket.lua
 # Main UI creates the shared page frames used by later feature/UI modules
 UI\IncomeRecordsSystem_UI.lua
 
+# Blizzard AddOns Options integration
+UI\IncomeRecordsSystem_AddonOptions.lua
+
 # Feature interfaces and domain systems
 Features\IncomeRecordsSystem_Reserves.lua
 Features\IncomeRecordsSystem_Tools.lua
