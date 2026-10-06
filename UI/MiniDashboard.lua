@@ -979,6 +979,11 @@ local function RestoreMiniDashboardOpenState()
         IRS:EnsureDB()
     end
 
+    if IRS.db.settings.autoOpenMiniDashboard == true then  
+        IRS:ShowMiniDashboard()
+        return
+    end
+
     local savedStates = IRS.db.ui
         and IRS.db.ui.miniDashboard
         and IRS.db.ui.miniDashboard.characterOpenState

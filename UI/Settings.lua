@@ -186,7 +186,7 @@ togglesDesc:SetText("General IRS interface switches live here.")
 local togglePanel = MakePanel(toggles, COLORS.panelAlt)
 togglePanel:SetPoint("TOPLEFT", 14, -72)
 togglePanel:SetPoint("TOPRIGHT", -14, -72)
-togglePanel:SetHeight(86)
+togglePanel:SetHeight(144)
 
 local minimapCheck = CreateFrame("CheckButton", nil, togglePanel, "UICheckButtonTemplate")
 minimapCheck:SetSize(30, 30)
@@ -203,6 +203,23 @@ minimapDesc:SetText("Display the IRS button on the minimap.")
 
 minimapCheck:SetScript("OnClick", function(self)
     IRS:SetSetting("showMinimapButton", self:GetChecked())
+end)
+
+local miniAutoOpenCheck = CreateFrame("CheckButton", nil, togglePanel, "UICheckButtonTemplate")
+miniAutoOpenCheck:SetSize(30, 30)
+miniAutoOpenCheck:SetPoint("TOPLEFT", 14, -76)
+
+local miniAutoOpenLabel = MakeText(togglePanel, 12, COLORS.text, "LEFT")
+miniAutoOpenLabel:SetPoint("TOPLEFT", miniAutoOpenCheck, "TOPRIGHT", 8, -1)
+miniAutoOpenLabel:SetText("Auto-open Mini Dashboard")
+
+local miniAutoOpenDesc = MakeText(togglePanel, 8, COLORS.muted, "LEFT")
+miniAutoOpenDesc:SetPoint("TOPLEFT", miniAutoOpenCheck, "TOPRIGHT", 8, -22)
+miniAutoOpenDesc:SetPoint("RIGHT", -12, 0)
+miniAutoOpenDesc:SetText("Open the Mini Dashboard automatically on every character when logging in.")
+
+miniAutoOpenCheck:SetScript("OnClick", function(self)
+    IRS:SetSetting("autoOpenMiniDashboard", self:GetChecked())
 end)
 
 -- ============================================================================
@@ -671,6 +688,7 @@ function IRS:RefreshSettingsPage()
     LayoutSettingsForFonts()
 
     minimapCheck:SetChecked(IRS.db.settings.showMinimapButton ~= false)
+    miniAutoOpenCheck:SetChecked(IRS.db.settings.autoOpenMiniDashboard == true)
     miniProjectsCheck:SetChecked(IRS.db.settings.showMiniProjects ~= false)
 
     if IRS.RefreshInternalTransferSettingsSection then

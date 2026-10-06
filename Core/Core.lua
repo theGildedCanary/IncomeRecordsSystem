@@ -563,6 +563,7 @@ function IRS:EnsureDB()
     db.settings = db.settings or {}
     if db.settings.showMinimapButton == nil then db.settings.showMinimapButton = true end
     if db.settings.showMiniProjects == nil then db.settings.showMiniProjects = true end
+    if db.settings.autoOpenMiniDashboard == nil then db.settings.autoOpenMiniDashboard = false end
 
     -- Preserve custom sizes from the previous numerical font settings.
     db.settings.fontSizes = db.settings.fontSizes or {}
