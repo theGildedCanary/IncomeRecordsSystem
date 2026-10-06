@@ -2809,7 +2809,7 @@ function IRS:GetMiniProjectDailySummary()
     if not IRS.db then IRS:EnsureDB() end
 
     local totalNeeded = 0
-    local totalChange = 0
+    local totalNet = IRS:GetCurrentEarnings().today or 0
     local trackedCount = 0
     local availableCount = 0
     local unavailableCount = 0
@@ -2822,21 +2822,20 @@ function IRS:GetMiniProjectDailySummary()
             if daily and daily.available then
                 availableCount = availableCount + 1
                 totalNeeded = totalNeeded + math.max(0, tonumber(daily.dailyGoal) or 0)
-                totalChange = totalChange + (tonumber(daily.todayChange) or 0)
             else
                 unavailableCount = unavailableCount + 1
             end
         end
     end
 
-    local difference = totalChange - totalNeeded
+    local difference = totalNet - totalNeeded
 
     return {
         trackedCount = trackedCount,
         availableCount = availableCount,
         unavailableCount = unavailableCount,
         dailyNeeded = totalNeeded,
-        todayChange = totalChange,
+        todayChange = totalNet,
         difference = difference,
         met = availableCount > 0 and difference >= 0,
     }
