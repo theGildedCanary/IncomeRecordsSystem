@@ -3505,7 +3505,7 @@ local function QueueScan(delay)
     scanGeneration = scanGeneration + 1
     local generation = scanGeneration
     C_Timer.After(delay or 0.25, function()
-        if generation <= scanGeneration and IRS.db then
+        if generation == scanGeneration and IRS.db then
             IRS:ScanCurrentCharacter()
         end
     end)

@@ -47,6 +47,30 @@ The error has not provided a usable Lua stack or locals trace, so the specific o
 
 Inspection of the current codebase shows that the login initialization path includes database initialization/migrations, a delayed full character scan, Warband Bank and project snapshot updates, and a master UI refresh. The master UI refresh in turn updates the Dashboard, Projects, Reserves, Tools, Characters, Reports, Settings, Mini Dashboard, and supporting layout/UI systems. Reserves and Tools also perform their own startup UI initialization.
 
+### Diagnostic Result — October 6, 2026
+
+The first captured timing report after instrumentation showed **281 full character scans during a single startup window**.
+
+The same report showed:
+
+- `Character scan`: 281 calls, 6312.67 ms total
+- `Master UI refresh`: 281 calls, 6024.18 ms total
+- `UI: Page scroll refresh`: 281 calls, 3548.65 ms total
+
+No individual scan or page refresh was unusually slow by itself. The problem was the number of repeated scans.
+
+Inspection of `QueueScan()` found that its debounce condition used:
+
+`generation <= scanGeneration`
+
+That condition allows every older queued timer to run because every previous generation is less than or equal to the newest generation. Login event bursts can therefore queue many delayed full scans instead of collapsing them into one.
+
+The debounce condition has been corrected to:
+
+`generation == scanGeneration`
+
+This means only the newest queued scan is allowed to execute. The timing instrumentation remains active temporarily so the fix can be verified on subsequent logins before the diagnostics are removed.
+
 ### Current Diagnostic Step
 
 Temporary lightweight startup timing instrumentation is now active.
