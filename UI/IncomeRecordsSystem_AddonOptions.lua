@@ -34,9 +34,10 @@ local openButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
 openButton:SetSize(220, 32)
 openButton:SetPoint("TOPLEFT", description, "BOTTOMLEFT", 0, -20)
 openButton:SetText("Open IRS Dashboard")
+
 openButton:SetScript("OnClick", function()
-    if SettingsPanel then
-        SettingsPanel:Hide()
+    if SettingsPanel and SettingsPanel:IsShown() then
+        HideUIPanel(SettingsPanel)
     end
     
     IRS:ShowUI("dashboard")
