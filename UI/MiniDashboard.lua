@@ -345,7 +345,7 @@ miniClose:SetPoint("TOPRIGHT", -3, -3)
 local miniTokenAlert = MakePanel(miniDashboard, COLORS.softFill)
 miniTokenAlert:SetPoint("TOPLEFT", miniHeader, "BOTTOMLEFT", 2, -6)
 miniTokenAlert:SetPoint("TOPRIGHT", miniHeader, "BOTTOMRIGHT", -2, -6)
-miniTokenAlert:SetHeight(48)
+miniTokenAlert:SetHeight(64)
 miniTokenAlert:Hide()
 
 miniTokenAlert.title = MakeText(
@@ -356,6 +356,7 @@ miniTokenAlert.title = MakeText(
     "OUTLINE"
 )
 miniTokenAlert.title:SetPoint("TOPLEFT", 9, -7)
+miniTokenAlert.title:SetPoint("TOPRIGHT", -9, -7)
 
 miniTokenAlert.action = MakeText(
     miniTokenAlert,
@@ -363,7 +364,8 @@ miniTokenAlert.action = MakeText(
     COLORS.goldSoft,
     "RIGHT"
 )
-miniTokenAlert.action:SetPoint("TOPRIGHT", -9, -7)
+miniTokenAlert.action:SetPoint("TOPLEFT", 9, -27)
+miniTokenAlert.action:SetPoint("TOPRIGHT", -9, -27)
 
 miniTokenAlert.detail = MakeText(
     miniTokenAlert,
@@ -371,8 +373,8 @@ miniTokenAlert.detail = MakeText(
     COLORS.muted,
     "LEFT"
 )
-miniTokenAlert.detail:SetPoint("TOPLEFT", 9, -27)
-miniTokenAlert.detail:SetPoint("TOPRIGHT", -9, -27)
+miniTokenAlert.detail:SetPoint("TOPLEFT", 9, -45)
+miniTokenAlert.detail:SetPoint("TOPRIGHT", -9, -45)
 
 local miniTokenPreviewSummary
 local miniTokenPreviewGeneration = 0
@@ -929,8 +931,8 @@ function IRS:RefreshMiniDashboard()
     local tokenAlertHeight = 0
     if showTokenAlert then
         tokenAlertHeight = math.max(
-            48,
-            heading2Size + helperSize + 25
+            64,
+            heading2Size + bodySize + helperSize + 30
         )
 
         miniTokenAlert:ClearAllPoints()
@@ -940,13 +942,31 @@ function IRS:RefreshMiniDashboard()
 
         miniTokenAlert.title:ClearAllPoints()
         miniTokenAlert.title:SetPoint("TOPLEFT", 9, -7)
+        miniTokenAlert.title:SetPoint("TOPRIGHT", -9, -7)
 
         miniTokenAlert.action:ClearAllPoints()
-        miniTokenAlert.action:SetPoint("TOPRIGHT", -9, -7)
+        miniTokenAlert.action:SetPoint(
+            "TOPLEFT",
+            9,
+            -(heading2Size + 13)
+        )
+        miniTokenAlert.action:SetPoint(
+            "TOPRIGHT",
+            -9,
+            -(heading2Size + 13)
+        )
 
         miniTokenAlert.detail:ClearAllPoints()
-        miniTokenAlert.detail:SetPoint("TOPLEFT", 9, -(heading2Size + 15))
-        miniTokenAlert.detail:SetPoint("TOPRIGHT", -9, -(heading2Size + 15))
+        miniTokenAlert.detail:SetPoint(
+            "TOPLEFT",
+            9,
+            -(heading2Size + bodySize + 20)
+        )
+        miniTokenAlert.detail:SetPoint(
+            "TOPRIGHT",
+            -9,
+            -(heading2Size + bodySize + 20)
+        )
     end
 
     local topContentAnchor = showTokenAlert
