@@ -374,22 +374,35 @@ miniTokenAlert.detail = MakeText(
 miniTokenAlert.detail:SetPoint("TOPLEFT", 9, -27)
 miniTokenAlert.detail:SetPoint("TOPRIGHT", -9, -27)
 
+local miniTokenPreviewSummary
+local miniTokenPreviewGeneration = 0
+
 local function UpdateMiniTokenAlert(summary)
     local market = IRS.EnsureTokenMarketDB
         and IRS:EnsureTokenMarketDB()
         or nil
     local settings = market and market.settings or nil
 
-    summary = summary
-        or (IRS.GetTokenMarketSummary and IRS:GetTokenMarketSummary())
-        or nil
+    local isPreview = miniTokenPreviewSummary ~= nil
+    if isPreview then
+        summary = miniTokenPreviewSummary
+    else
+        summary = summary
+            or (IRS.GetTokenMarketSummary and IRS:GetTokenMarketSummary())
+            or nil
+    end
 
-    local show = settings
-        and settings.screenAlert ~= false
-        and summary
-        and summary.enabled ~= false
-        and IRS.IsTokenAlertStatus
-        and IRS:IsTokenAlertStatus(summary.status)
+    local show
+    if isPreview then
+        show = summary ~= nil
+    else
+        show = settings
+            and settings.screenAlert ~= false
+            and summary
+            and summary.enabled ~= false
+            and IRS.IsTokenAlertStatus
+            and IRS:IsTokenAlertStatus(summary.status)
+    end
 
     miniTokenAlert:SetShown(show == true)
 
@@ -406,12 +419,14 @@ local function UpdateMiniTokenAlert(summary)
         "WOW TOKEN — " .. tostring(summary.status)
     )
     miniTokenAlert.action:SetText(action)
+    local detailPrefix = isPreview and "TEST PREVIEW  •  " or ""
     miniTokenAlert.detail:SetText(
-        string.format(
+        detailPrefix
+        .. string.format(
             "%s  •  %+.1f%% vs %d-day average",
             IRS:FormatMoney(summary.current or 0, true),
             summary.differencePercent or 0,
-            tonumber(settings.averageDays) or 7
+            tonumber(settings and settings.averageDays) or 7
         )
     )
 
@@ -1156,6 +1171,34 @@ function IRS:RefreshMiniTokenAlert(summary)
     if miniDashboard:IsShown() and IRS.RefreshMiniDashboard then
         IRS:RefreshMiniDashboard()
     end
+end
+
+function IRS:PreviewMiniTokenAlert(summary, duration)
+    if type(summary) ~= "table" then return false end
+
+    miniTokenPreviewGeneration = miniTokenPreviewGeneration + 1
+    local generation = miniTokenPreviewGeneration
+    miniTokenPreviewSummary = summary
+
+    if IRS.RefreshMiniDashboard then
+        IRS:RefreshMiniDashboard()
+    else
+        UpdateMiniTokenAlert(summary)
+    end
+
+    C_Timer.After(math.max(1, tonumber(duration) or 9), function()
+        if generation ~= miniTokenPreviewGeneration then return end
+
+        miniTokenPreviewSummary = nil
+
+        if IRS.RefreshMiniDashboard then
+            IRS:RefreshMiniDashboard()
+        else
+            UpdateMiniTokenAlert()
+        end
+    end)
+
+    return true
 end
 
 -- ============================================================================

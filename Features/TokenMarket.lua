@@ -351,8 +351,10 @@ local function ShowTokenSplash(summary)
     tokenSplash.action:SetText(action)
     SetColor(tokenSplash.action, color)
 
+    local detailPrefix = summary.preview and "TEST PREVIEW  •  " or ""
     tokenSplash.detail:SetText(
-        string.format(
+        detailPrefix
+        .. string.format(
             "%s  •  %+.1f%% vs %d-day average",
             IRS:FormatMoney(summary.current or 0, true),
             summary.differencePercent or 0,
@@ -402,6 +404,47 @@ function IRS:ShowTokenVisualAlert(summary)
         IRS:RefreshMiniTokenAlert(summary)
     else
         ShowTokenSplash(summary)
+    end
+
+    return true
+end
+
+-- Visual-only preview used by the Settings buttons. It deliberately bypasses
+-- Screen alert enablement and does not touch history, lastZone, chat, or sound.
+function IRS:TestTokenVisualAlert(direction)
+    local market = IRS:EnsureTokenMarketDB()
+    local settings = market.settings
+    local realSummary = IRS:GetTokenMarketSummary()
+    local isBuy = tostring(direction or ""):lower() == "buy"
+
+    local fallbackPrice = realSummary.current
+    if not fallbackPrice or fallbackPrice <= 0 then
+        fallbackPrice = realSummary.average
+    end
+    if not fallbackPrice or fallbackPrice <= 0 then
+        fallbackPrice = 300000 * 10000
+    end
+
+    local difference = isBuy
+        and -math.max(1, tonumber(settings.buyPercent) or 8)
+        or math.max(1, tonumber(settings.sellPercent) or 8)
+
+    local preview = {
+        status = isBuy and "GOOD BUY" or "GOOD SELL",
+        current = fallbackPrice,
+        differencePercent = difference,
+        enabled = true,
+        preview = true,
+    }
+
+    local miniOpen = IRS.miniDashboardFrame
+        and IRS.miniDashboardFrame:IsShown()
+
+    if miniOpen and IRS.PreviewMiniTokenAlert then
+        HideTokenSplash()
+        IRS:PreviewMiniTokenAlert(preview, 9)
+    else
+        ShowTokenSplash(preview)
     end
 
     return true
@@ -814,6 +857,41 @@ function IRS:BuildTokenSettingsSection(parent)
         80,
         function(v) IRS:SetTokenMarketSetting("extremeSellPercent", v) end
     )
+
+    local testLabel = MakeText(
+        alertPanel,
+        "helper",
+        COLORS.muted,
+        "LEFT"
+    )
+    testLabel:SetPoint("TOPLEFT", 332, -142)
+    testLabel:SetText("VISUAL ALERT TEST")
+
+    settingsUI.testBuy = CreateFrame(
+        "Button",
+        nil,
+        alertPanel,
+        "UIPanelButtonTemplate"
+    )
+    settingsUI.testBuy:SetSize(112, 24)
+    settingsUI.testBuy:SetPoint("TOPLEFT", 332, -162)
+    settingsUI.testBuy:SetText("Test Buy Alert")
+    settingsUI.testBuy:SetScript("OnClick", function()
+        IRS:TestTokenVisualAlert("buy")
+    end)
+
+    settingsUI.testSell = CreateFrame(
+        "Button",
+        nil,
+        alertPanel,
+        "UIPanelButtonTemplate"
+    )
+    settingsUI.testSell:SetSize(112, 24)
+    settingsUI.testSell:SetPoint("TOPLEFT", 454, -162)
+    settingsUI.testSell:SetText("Test Sell Alert")
+    settingsUI.testSell:SetScript("OnClick", function()
+        IRS:TestTokenVisualAlert("sell")
+    end)
 
     local help = MakeText(alertPanel, "helper", COLORS.muted, "LEFT")
     help:SetPoint("BOTTOMLEFT", 12, 12)
