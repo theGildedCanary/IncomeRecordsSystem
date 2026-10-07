@@ -31,6 +31,7 @@ description:SetText(
 
 -- Open Dashboard Button
 local openButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+IRS:StyleButtonFeedback(openButton)
 openButton:SetSize(220, 32)
 openButton:SetPoint("TOPLEFT", description, "BOTTOMLEFT", 0, -20)
 openButton:SetText("Open IRS Dashboard")

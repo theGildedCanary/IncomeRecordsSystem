@@ -336,6 +336,7 @@ miniHeaderSub:SetPoint("TOPLEFT", miniHeaderTitle, "BOTTOMLEFT", 0, -1)
 miniHeaderSub:SetText("NET GOLD")
 
 local miniClose = CreateFrame("Button", nil, miniDashboard, "UIPanelCloseButton")
+IRS:StyleButtonFeedback(miniClose)
 miniClose:SetPoint("TOPRIGHT", -3, -3)
 
 -- ============================================================================
@@ -508,6 +509,7 @@ miniProjectsHeader.topLine = AddDivider(miniProjectsHeader, "TOPLEFT", "TOPLEFT"
 -- This arrow ONLY expands/collapses the visible section; it never changes the
 -- Settings checkbox.
 local miniProjectsCollapse = CreateFrame("Button", nil, miniProjectsHeader)
+IRS:StyleButtonFeedback(miniProjectsCollapse)
 miniProjectsCollapse:SetSize(22, 22)
 miniProjectsCollapse:SetPoint("RIGHT", -2, 0)
 
@@ -664,6 +666,7 @@ miniReservesHeader.title:SetText("RESERVE FUNDS")
 -- Reserve Funds collapse independently from Savings Projects. The state is
 -- stored on the Mini Dashboard so it survives reloads and relogs.
 local miniReservesCollapse = CreateFrame("Button", nil, miniReservesHeader)
+IRS:StyleButtonFeedback(miniReservesCollapse)
 miniReservesCollapse:SetSize(22, 22)
 miniReservesCollapse:SetPoint("RIGHT", -2, 0)
 miniReservesCollapse.icon = miniReservesCollapse:CreateTexture(nil, "ARTWORK")

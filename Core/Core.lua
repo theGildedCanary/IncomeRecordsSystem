@@ -9,6 +9,30 @@ local ADDON_NAME = ...
 IRS = IRS or {}
 local IRS = IRS
 
+-- Adds consistent hover and disabled feedback without replacing a button's
+-- existing scripts, backdrop colors, or click behavior.
+function IRS:StyleButtonFeedback(button)
+    if not button or button._irsButtonFeedbackApplied then return end
+    button._irsButtonFeedbackApplied = true
+
+    local highlight = button:CreateTexture(nil, "HIGHLIGHT")
+    highlight:SetAllPoints(button)
+    highlight:SetColorTexture(0.86, 0.71, 0.36, 0.12)
+    highlight:SetBlendMode("ADD")
+
+    local normalAlpha = button:GetAlpha()
+    button:HookScript("OnDisable", function(self)
+        self:SetAlpha(normalAlpha * 0.5)
+    end)
+    button:HookScript("OnEnable", function(self)
+        self:SetAlpha(normalAlpha)
+    end)
+
+    if not button:IsEnabled() then
+        button:SetAlpha(normalAlpha * 0.5)
+    end
+end
+
 IRS.version = "0.17.3"
 
 -- ============================================================================
@@ -1734,6 +1758,39 @@ function IRS:GetCharacterEarnings(characterKey)
     }
 end
 
+-- Applies a signed correction to today's account and current-character net
+-- only. Historical totals, source categories, and wallet balances stay intact.
+function IRS:AdjustCurrentCharacterDailyEarnings(amount)
+    if not IRS.db then IRS:EnsureDB() end
+
+    amount = tonumber(amount)
+    if not amount then return false, "Adjustment must be a number." end
+    amount = math.floor(amount)
+    if amount == 0 then return false, "Adjustment cannot be zero." end
+
+    local characterKey = IRS:CharacterKey()
+    local record = IRS.db.characters[characterKey]
+    if not record then
+        return false, "Current character has not been scanned yet. Run /irs scan and try again."
+    end
+
+    local dayKey = select(1, IRS:GetPeriodKeys())
+    local accountDay = EnsureBucket(IRS.db.tracking.days, dayKey)
+    record.periodEarnings = record.periodEarnings
+        or {days = {}, weeks = {}, months = {}}
+    record.periodEarnings.days = record.periodEarnings.days or {}
+
+    accountDay.earned = (tonumber(accountDay.earned) or 0) + amount
+    record.periodEarnings.days[dayKey] =
+        (tonumber(record.periodEarnings.days[dayKey]) or 0) + amount
+
+    return true, {
+        amount = amount,
+        dayKey = dayKey,
+        characterKey = characterKey,
+    }
+end
+
 -- Returns the most recent N daily account-ledger entries for the dashboard graph.
 -- Missing days are returned as zero so the chart stays continuous.
 function IRS:GetRecentDailyEarnings(count)
@@ -3218,21 +3275,20 @@ function IRS:GetProjectDailyGoalStatus(projectId)
 end
 
 
--- Adds together TODAY'S fixed daily goals and actual allocated source changes
--- for every project the player has selected for the floating mini dashboard.
+-- Sums TODAY'S fixed daily goals for every project selected for the floating
+-- mini dashboard and compares that target with account-wide net income.
 --
 -- Important:
 --   * This includes ALL selected projects, not only the first five visible rows.
---   * Each project's observed change already respects its Allocation %.
---   * If allocations intentionally overlap, the aggregate follows those
---     configured allocations as written.
+--   * The target is the sum of project goals and does not change with splits.
+--   * Today's net income is account-wide and is not scaled by project splits.
 --   * Unavailable project sources are excluded from the numeric total and
 --     reported separately so stale/unknown balances do not distort the result.
 function IRS:GetMiniProjectDailySummary()
     if not IRS.db then IRS:EnsureDB() end
 
     local totalNeeded = 0
-    local totalChange = 0
+    local todayNetIncome = math.floor(tonumber(IRS:GetCurrentEarnings().today) or 0)
     local trackedCount = 0
     local availableCount = 0
     local unavailableCount = 0
@@ -3245,21 +3301,20 @@ function IRS:GetMiniProjectDailySummary()
             if daily and daily.available then
                 availableCount = availableCount + 1
                 totalNeeded = totalNeeded + math.max(0, tonumber(daily.dailyGoal) or 0)
-                totalChange = totalChange + (tonumber(daily.todayChange) or 0)
             else
                 unavailableCount = unavailableCount + 1
             end
         end
     end
 
-    local difference = totalChange - totalNeeded
+    local difference = todayNetIncome - totalNeeded
 
     return {
         trackedCount = trackedCount,
         availableCount = availableCount,
         unavailableCount = unavailableCount,
         dailyNeeded = totalNeeded,
-        todayChange = totalChange,
+        todayNetIncome = todayNetIncome,
         difference = difference,
         met = availableCount > 0 and difference >= 0,
     }

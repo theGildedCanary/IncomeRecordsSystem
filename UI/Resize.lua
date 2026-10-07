@@ -65,6 +65,7 @@ end
 
 local function MakeGrip(parent)
     local grip = CreateFrame("Button", nil, parent)
+    IRS:StyleButtonFeedback(grip)
     grip:SetSize(24, 24)
     grip:SetPoint("BOTTOMRIGHT", -2, 2)
     grip:SetFrameLevel(parent:GetFrameLevel() + 20)
@@ -91,6 +92,7 @@ end
 
 local function MakeLockButton(parent, width, x, y)
     local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    IRS:StyleButtonFeedback(button)
     button:SetSize(width, 20)
     button:SetPoint("TOPRIGHT", x, y)
     button:SetFrameLevel(parent:GetFrameLevel() + 21)

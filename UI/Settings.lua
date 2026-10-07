@@ -130,6 +130,7 @@ end
 
 for i, info in ipairs(SECTION_INFO) do
     local button = CreateFrame("Button", nil, rail, "BackdropTemplate")
+    IRS:StyleButtonFeedback(button)
     button:SetPoint("TOPLEFT", 7, -8 - ((i - 1) * 38))
     button:SetSize(140, 32)
     button:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8" })
@@ -285,6 +286,7 @@ local anchorChoices = {
 
 for i, choice in ipairs(anchorChoices) do
     local button = CreateFrame("Button", nil, anchorPanel, "BackdropTemplate")
+    IRS:StyleButtonFeedback(button)
     button:SetSize(135, 30)
     button:SetPoint("TOPLEFT", 12 + ((i - 1) * 145), -64)
     button:SetBackdrop({
@@ -497,6 +499,7 @@ local function MakeFontControl(parent, scope, styleKey, x, y, width)
     )
 
     row.minus = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+    IRS:StyleButtonFeedback(row.minus)
     row.minus:SetSize(28, 24)
     row.minus:SetPoint("LEFT", 158, 0)
     row.minus:SetText("−")
@@ -512,6 +515,7 @@ local function MakeFontControl(parent, scope, styleKey, x, y, width)
     row.field.styleKey = styleKey
 
     row.plus = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+    IRS:StyleButtonFeedback(row.plus)
     row.plus:SetSize(28, 24)
     row.plus:SetPoint("LEFT", row.field, "RIGHT", 5, 0)
     row.plus:SetText("+")
@@ -556,6 +560,7 @@ mainFontDesc:SetPoint("RIGHT", -140, 0)
 mainFontDesc:SetText("Seven shared styles cover Dashboard, Projects, Characters, Reports, Settings, and Help.")
 
 local resetMain = CreateFrame("Button", nil, mainFontPanel, "UIPanelButtonTemplate")
+IRS:StyleButtonFeedback(resetMain)
 resetMain:SetSize(118, 24)
 resetMain:SetPoint("TOPRIGHT", -12, -12)
 resetMain:SetText("Reset Main")
@@ -588,6 +593,7 @@ miniFontDesc:SetPoint("RIGHT", -140, 0)
 miniFontDesc:SetText("Six independent styles control the floating mini dashboard only.")
 
 local resetMini = CreateFrame("Button", nil, miniFontPanel, "UIPanelButtonTemplate")
+IRS:StyleButtonFeedback(resetMini)
 resetMini:SetSize(118, 24)
 resetMini:SetPoint("TOPRIGHT", -12, -12)
 resetMini:SetText("Reset Mini")

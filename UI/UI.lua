@@ -193,6 +193,7 @@ lastUpdated:SetWidth(210)
 lastUpdated:SetText("Last Updated\n—")
 
 local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+IRS:StyleButtonFeedback(close)
 close:SetPoint("TOPRIGHT", -8, -8)
 
 -- ============================================================================
@@ -225,6 +226,7 @@ IRS.pageFrames = IRS.pageFrames or {}
 -- Builds one left-sidebar navigation button and wires its hover/click behavior.
 local function MakeTab(key, label, y)
     local button = CreateFrame("Button", nil, rail, "BackdropTemplate")
+    IRS:StyleButtonFeedback(button)
     button:SetPoint("TOPLEFT", 4, y)
     button:SetSize(96, 34)
     button:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8" })
@@ -287,6 +289,7 @@ currentLine:SetPoint("TOPRIGHT", -184, -2)
 currentLine:SetText("CURRENT CHARACTER")
 
 local rescanButton = CreateFrame("Button", nil, dashboard, "UIPanelButtonTemplate")
+IRS:StyleButtonFeedback(rescanButton)
 rescanButton:SetSize(88, 22)
 rescanButton:SetPoint("TOPRIGHT", -2, 2)
 rescanButton:SetText("Rescan")
@@ -294,6 +297,7 @@ rescanButton:SetScript("OnClick", function() IRS:ScanCurrentCharacter() end)
 
 -- Opens the floating at-a-glance panel without leaving the main Dashboard.
 local miniButton = CreateFrame("Button", nil, dashboard, "UIPanelButtonTemplate")
+IRS:StyleButtonFeedback(miniButton)
 miniButton:SetSize(76, 22)
 miniButton:SetPoint("RIGHT", rescanButton, "LEFT", -6, 0)
 miniButton:SetText("Mini")
@@ -535,11 +539,10 @@ projectsDesc:SetPoint("RIGHT", -4, 0)
 projectsDesc:SetText("Create and manage long-term savings goals. Distribution and reserve planning live in the Allocation tab.")
 
 local projectManagementView = CreateFrame("Frame", nil, projectsPage)
-projectManagementView:SetAllPoints(projectsPage)
+projectManagementView:SetPoint("BOTTOMRIGHT", projectsPage, "BOTTOMRIGHT", 0, 0)
 IRS.projectManagementView = projectManagementView
 
 local projectAllocationView = CreateFrame("Frame", nil, projectsPage)
-projectAllocationView:SetPoint("TOPLEFT", projectsPage, "TOPLEFT", 4, -58)
 projectAllocationView:SetPoint("BOTTOMRIGHT", projectsPage, "BOTTOMRIGHT", -4, 4)
 projectAllocationView:Hide()
 IRS.projectAllocationView = projectAllocationView
@@ -547,6 +550,7 @@ IRS.projectAllocationView = projectAllocationView
 -- Consistent button factory used inside the Projects page.
 local function MakeProjectButton(parent, text, x, y, w, onClick)
     local b = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    IRS:StyleButtonFeedback(b)
     b:SetPoint("TOPLEFT", x, y)
     b:SetSize(w, 28)
     b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 1 })
@@ -561,11 +565,30 @@ end
 
 local projectManagementTab = MakeProjectButton(projectsPage, "PROJECT MANAGEMENT", 0, 0, 170)
 projectManagementTab:ClearAllPoints()
-projectManagementTab:SetPoint("TOPRIGHT", projectsPage, "TOPRIGHT", -126, -2)
+projectManagementTab:SetPoint("TOPLEFT", projectsDesc, "BOTTOMLEFT", 0, -14)
 
 local projectAllocationTab = MakeProjectButton(projectsPage, "ALLOCATION", 0, 0, 116)
 projectAllocationTab:ClearAllPoints()
-projectAllocationTab:SetPoint("TOPRIGHT", projectsPage, "TOPRIGHT", -4, -2)
+projectAllocationTab:SetPoint("LEFT", projectManagementTab, "RIGHT", 8, 0)
+
+local projectTabsDivider = projectsPage:CreateTexture(nil, "ARTWORK")
+projectTabsDivider:SetColorTexture(unpack(COLORS.borderSoft))
+projectTabsDivider:SetHeight(2)
+projectTabsDivider:SetPoint("TOPLEFT", projectsPage, "TOPLEFT", 4, -88)
+projectTabsDivider:SetPoint("TOPRIGHT", projectsPage, "TOPRIGHT", -4, -88)
+
+projectManagementView:SetPoint("TOPLEFT", projectTabsDivider, "BOTTOMLEFT", -4, -10)
+projectAllocationView:SetPoint("TOPLEFT", projectTabsDivider, "BOTTOMLEFT", 0, -10)
+
+local projectManagementHeading = MakeText(projectManagementView, 13, COLORS.goldSoft, "LEFT")
+projectManagementHeading:SetPoint("TOPLEFT", 4, 0)
+projectManagementHeading:SetText("PROJECT MANAGEMENT")
+
+local projectManagementDesc = MakeText(projectManagementView, 8, COLORS.muted, "LEFT")
+projectManagementDesc:SetPoint("TOPLEFT", projectManagementHeading, "BOTTOMLEFT", 0, -4)
+projectManagementDesc:SetPoint("TOPRIGHT", -4, 0)
+projectManagementDesc:SetWordWrap(true)
+projectManagementDesc:SetText("Create savings goals, set their targets and deadlines, choose funding sources, and track progress.")
 
 function IRS:SetProjectsSection(section)
     if not IRS.db then IRS:EnsureDB() end
@@ -670,6 +693,7 @@ projectPopup.rows = {}
 local function EnsureProjectPopupRow(index)
     if projectPopup.rows[index] then return projectPopup.rows[index] end
     local b = CreateFrame("Button", nil, projectPopupChild, "BackdropTemplate")
+    IRS:StyleButtonFeedback(b)
     b:SetHeight(26)
     b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8" })
     b:SetBackdropColor(0.035, 0.038, 0.038, 0.96)
@@ -717,6 +741,7 @@ local sourceChoices = {
 }
 for i, item in ipairs(sourceChoices) do
     local b = CreateFrame("Button", nil, sourcePopup, "BackdropTemplate")
+    IRS:StyleButtonFeedback(b)
     b:SetPoint("TOPLEFT", 4, -4 - ((i - 1) * 28)); b:SetSize(182, 26)
     b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8" }); b:SetBackdropColor(0.035,0.038,0.038,0.98)
     b.text = MakeText(b, 9, COLORS.text, "LEFT"); b.text:SetPoint("LEFT", 8, 0); b.text:SetText(item.label)
@@ -745,6 +770,7 @@ sourceDetailPopup.rows = {}
 local function EnsureDetailRow(index)
     if sourceDetailPopup.rows[index] then return sourceDetailPopup.rows[index] end
     local b = CreateFrame("Button", nil, detailChild, "BackdropTemplate")
+    IRS:StyleButtonFeedback(b)
     b:SetHeight(25); b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8" }); b:SetBackdropColor(0.035,0.038,0.038,0.98)
     b.text = MakeText(b, 9, COLORS.text, "LEFT"); b.text:SetPoint("LEFT", 8, 0); b.text:SetPoint("RIGHT", -6, 0)
     b:SetScript("OnEnter", function(self) self:SetBackdropColor(0.10,0.08,0.05,1) end)
@@ -913,6 +939,7 @@ local graphIntervalChoices = {
 for i, info in ipairs(graphIntervalChoices) do
     local intervalKey = info.key
     local button = CreateFrame("Button", nil, graphPanel, "BackdropTemplate")
+    IRS:StyleButtonFeedback(button)
     button:SetSize(78, 22)
     button:SetPoint("TOPRIGHT", -12 - ((#graphIntervalChoices - i) * 82), -32)
     button:SetBackdrop({
@@ -1581,6 +1608,7 @@ scopeLabel:SetPoint("TOPLEFT", 4, -65)
 scopeLabel:SetText("SCOPE")
 
 local scopeButton = CreateFrame("Button", nil, reportsPage, "BackdropTemplate")
+IRS:StyleButtonFeedback(scopeButton)
 scopeButton:SetPoint("TOPLEFT", 4, -82)
 scopeButton:SetSize(250, 28)
 scopeButton:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 2 })
@@ -1602,6 +1630,7 @@ local reportPeriodButtons = {}
 -- Builds the compact report-view buttons (Day/Week/Month, Best/Avg, Sources).
 local function MakeSmallToggle(parent, text, x, width, onClick)
     local b = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    IRS:StyleButtonFeedback(b)
     b:SetPoint("TOPLEFT", x, -82)
     b:SetSize(width, 28)
     b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 2 })
@@ -1651,6 +1680,7 @@ scopePopup.rows = {}
 local function EnsureScopeRow(index)
     if scopePopup.rows[index] then return scopePopup.rows[index] end
     local b = CreateFrame("Button", nil, scopeChild, "BackdropTemplate")
+    IRS:StyleButtonFeedback(b)
     b:SetHeight(24)
     b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8" })
     b:SetBackdropColor(0.035, 0.038, 0.038, 0.96)
@@ -2956,6 +2986,7 @@ end
 -- Right-click opens/closes the floating mini dashboard.
 -- ============================================================================
 local minimapButton = CreateFrame("Button", "IncomeRecordsSystemMinimapButton", Minimap)
+IRS:StyleButtonFeedback(minimapButton)
 minimapButton:SetSize(34, 34)
 minimapButton:SetPoint("CENTER", Minimap, "CENTER", -56, -56)
 minimapButton:SetFrameStrata("MEDIUM")

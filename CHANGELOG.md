@@ -10,10 +10,13 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 
 - Added a seven-day Transaction Log that records each observed wallet change, its IRS ledger effect, transfer classification, and diagnostic reason.
 - Added `/irs transactions` and expanded `/irs debug` with transaction-audit summaries.
+- Added a Tools control for applying signed corrections to the current character's and account-wide Today net without altering longer-period totals or source categories.
 
 ### Changed
 
-- Project allocation splits now apply to daily source changes instead of reassigning each project's entire current source balance; changing a split no longer moves the Mini Dashboard's fixed daily requirement.
+- Clickable controls now share a gold hover highlight and muted disabled state across IRS pages and feature panels.
+- Mini Dashboard's Daily Gold Target now sums selected Projects' deadline-based daily contribution goals and no longer changes when allocation percentages change.
+- Project allocation splits apply to daily source changes instead of reassigning each project's entire current source balance; changing a split affects attributed progress, not the Mini Dashboard's fixed daily target.
 - Savings Projects now use separate Project Management and Allocation tabs.
 - Profit Distribution moved from Tools into Savings Projects > Allocation.
 - Each Savings Project now has its own linked Distribution % slider; changing one slider automatically redistributes the remaining percentage across the other Projects so Project Distribution always totals 100%.

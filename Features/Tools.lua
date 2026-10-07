@@ -411,6 +411,7 @@ end
 
 local function MakeButton(parent, text, x, y, width)
     local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    IRS:StyleButtonFeedback(button)
     button:SetPoint("TOPLEFT", x, y)
     button:SetSize(width, 30)
     button:SetBackdrop({bgFile="Interface/Buttons/WHITE8X8",edgeFile="Interface/Buttons/WHITE8X8",edgeSize=2})
@@ -432,6 +433,30 @@ local function WholeGold(copper, signed)
     return text .. "g"
 end
 
+local function ParseSignedGoldInput(text)
+    local value = strtrim(tostring(text or "")):lower():gsub(",", ""):gsub("%s+", "")
+    local signText, amountText = value:match("^([+-]?)(%d+%.?%d*[km]?g?)$")
+    if not amountText then return nil end
+    local sign = signText == "-" and -1 or 1
+
+    amountText = amountText:gsub("g$", "")
+    local multiplier = 1
+    local suffix = amountText:sub(-1)
+    if suffix == "k" then
+        multiplier = 1000
+        amountText = amountText:sub(1, -2)
+    elseif suffix == "m" then
+        multiplier = 1000000
+        amountText = amountText:sub(1, -2)
+    end
+
+    local gold = tonumber(amountText)
+    if not gold or gold <= 0 then return nil end
+    local wholeGold = math.floor((gold * multiplier) + 0.5)
+    if wholeGold <= 0 then return nil end
+    return wholeGold * 10000 * sign
+end
+
 local function PercentText(value)
     return string.format("%.1f", tonumber(value) or 0):gsub("%.0$", "") .. "%"
 end
@@ -444,8 +469,91 @@ local subtitle = MakeText(page, "body", COLORS.muted, "LEFT")
 subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -3)
 subtitle:SetText("Reference IRS systems and addon behavior. Savings allocation now lives under Projects > Allocation.")
 
+local dailyAdjustmentPanel = MakePanel(page, COLORS.panel)
+dailyAdjustmentPanel:SetPoint("TOPLEFT", 4, -58)
+dailyAdjustmentPanel:SetPoint("TOPRIGHT", -4, -58)
+dailyAdjustmentPanel:SetHeight(118)
+
+local dailyAdjustmentHeading = MakeText(dailyAdjustmentPanel, "section", COLORS.goldSoft, "LEFT")
+dailyAdjustmentHeading:SetPoint("TOPLEFT", 12, -8)
+dailyAdjustmentHeading:SetText("MANUAL DAILY INCOME ADJUSTMENT")
+
+local dailyAdjustmentHelp = MakeText(dailyAdjustmentPanel, "helper", COLORS.muted, "LEFT")
+dailyAdjustmentHelp:SetPoint("TOPLEFT", dailyAdjustmentHeading, "BOTTOMLEFT", 0, -3)
+dailyAdjustmentHelp:SetPoint("TOPRIGHT", -12, 0)
+dailyAdjustmentHelp:SetText("Enter a signed gold amount to correct today's net income for this character. Example: +500g adds income; -500g subtracts it. This changes Today only, not Week, Month, Total, wallet gold, or source categories.")
+dailyAdjustmentHelp:SetWordWrap(true)
+
+local dailyAdjustmentCharacter = MakeText(dailyAdjustmentPanel, "body", COLORS.text, "LEFT")
+dailyAdjustmentCharacter:SetPoint("TOPLEFT", 12, -66)
+dailyAdjustmentCharacter:SetWidth(370)
+
+local dailyAdjustmentInputLabel = MakeText(dailyAdjustmentPanel, "helper", COLORS.goldSoft, "RIGHT")
+dailyAdjustmentInputLabel:SetPoint("TOPLEFT", 390, -67)
+dailyAdjustmentInputLabel:SetWidth(112)
+dailyAdjustmentInputLabel:SetText("ADJUSTMENT")
+
+local dailyAdjustmentInput = CreateFrame("EditBox", nil, dailyAdjustmentPanel, "InputBoxTemplate")
+dailyAdjustmentInput:SetSize(100, 24)
+dailyAdjustmentInput:SetPoint("LEFT", dailyAdjustmentInputLabel, "RIGHT", 6, 0)
+dailyAdjustmentInput:SetAutoFocus(false)
+dailyAdjustmentInput:SetJustifyH("RIGHT")
+dailyAdjustmentInput:SetFontObject(GameFontHighlightSmall)
+dailyAdjustmentInput:SetMaxLetters(18)
+dailyAdjustmentInput:SetNumeric(false)
+dailyAdjustmentInput:SetText("")
+
+local dailyAdjustmentButton = MakeButton(dailyAdjustmentPanel, "APPLY", 0, 0, 100)
+dailyAdjustmentButton:ClearAllPoints()
+dailyAdjustmentButton:SetPoint("LEFT", dailyAdjustmentInput, "RIGHT", 12, 0)
+dailyAdjustmentButton:SetSize(92, 30)
+
+local dailyAdjustmentStatus = MakeText(dailyAdjustmentPanel, "helper", COLORS.muted, "LEFT")
+dailyAdjustmentStatus:SetPoint("TOPLEFT", dailyAdjustmentCharacter, "BOTTOMLEFT", 0, -6)
+dailyAdjustmentStatus:SetPoint("RIGHT", -12, 0)
+
+local function RefreshDailyAdjustmentInfo()
+    local characterKey = IRS:CharacterKey()
+    local earnings = IRS:GetCharacterEarnings(characterKey)
+    dailyAdjustmentCharacter:SetText(string.format(
+        "%s — Today: %s",
+        IRS:CharacterLabel(),
+        WholeGold(earnings.today, true)
+    ))
+end
+
+local function ApplyDailyAdjustment()
+    local amount = ParseSignedGoldInput(dailyAdjustmentInput:GetText())
+    if not amount then
+        dailyAdjustmentStatus:SetText("Enter a non-zero signed amount, such as +500g or -500g.")
+        SetColor(dailyAdjustmentStatus, COLORS.red)
+        return
+    end
+
+    local success, result = IRS:AdjustCurrentCharacterDailyEarnings(amount)
+    if not success then
+        dailyAdjustmentStatus:SetText(tostring(result or "Could not apply the adjustment."))
+        SetColor(dailyAdjustmentStatus, COLORS.red)
+        return
+    end
+
+    dailyAdjustmentInput:SetText("")
+    dailyAdjustmentStatus:SetText("Applied " .. WholeGold(result.amount, true) .. " to today's net income.")
+    SetColor(dailyAdjustmentStatus, COLORS.green)
+    RefreshDailyAdjustmentInfo()
+    if IRS.RefreshUI then IRS:RefreshUI() end
+    if IRS.RefreshMiniDashboard then IRS:RefreshMiniDashboard() end
+end
+
+dailyAdjustmentButton:SetScript("OnClick", ApplyDailyAdjustment)
+dailyAdjustmentInput:SetScript("OnEnterPressed", function(self)
+    ApplyDailyAdjustment()
+    self:ClearFocus()
+end)
+dailyAdjustmentInput:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+
 local manualView = CreateFrame("Frame", nil, page)
-manualView:SetPoint("TOPLEFT", 4, -55)
+manualView:SetPoint("TOPLEFT", 4, -190)
 manualView:SetPoint("BOTTOMRIGHT", -4, 4)
 
 local manualHeading = MakeText(manualView, "section", COLORS.goldSoft, "LEFT")
@@ -473,8 +581,12 @@ local MANUAL_SECTIONS = {
         "Today, This Week, This Month, and Total Recorded are IRS net values. Green means positive, red means negative. The smaller line under each account total is the current character's contribution. Daily Earnings shows recent day-by-day net results. Account Overview uses Blizzard lifetime statistics where available and IRS-observed values for features Blizzard does not expose, such as tracked transmog spending."
     },
     {
+        "MANUAL DAILY INCOME ADJUSTMENT",
+        "Tools can apply a signed correction to the current character's Today net and the account-wide Today net. Enter +500g to add 500 gold or -500g to subtract it. The correction affects Today only; it does not change Week, Month, Total Recorded, wallet gold, or source-category totals."
+    },
+    {
         "MINI DASHBOARD",
-        "The Mini Dashboard is a draggable at-a-glance panel. Its net-gold section can show the active character's daily net plus account-wide Today, This Week, This Month, and Total Recorded values; each statistic can be shown or hidden in Settings. It also shows selected Savings Projects, selected Reserve Funds, and the combined Daily Gold Target. The Daily Gold Target compares the selected Projects' combined daily requirement against the sum of those Projects' actual allocated source changes today, so the total uses the same savings progress shown by the individual rows. When WoW Token Screen alerts are enabled, an active Good/Extreme Buy or Sell zone appears as a persistent banner under the Mini Dashboard header; if the Mini Dashboard is closed when the market enters an alert zone, IRS shows a temporary splash notification instead. Savings Projects and Reserve Funds can be collapsed independently. Right-click the minimap button or use /irs mini to toggle it. Its position, size, collapse states, and per-character open state are saved, and Settings can optionally auto-open it on login."
+        "The Mini Dashboard is a draggable at-a-glance panel. Its net-gold section can show the active character's daily net plus account-wide Today, This Week, This Month, and Total Recorded values; each statistic can be shown or hidden in Settings. It also shows selected Savings Projects, selected Reserve Funds, and the Daily Gold Target. Each project's row shows its fixed deadline-based daily contribution goal and whether its allocated source change met that goal. The Daily Gold Target is the sum of the selected projects' daily contribution goals, independent of their allocation percentages; its over/short status compares that total with today's account-wide net income. When WoW Token Screen alerts are enabled, an active Good/Extreme Buy or Sell zone appears as a persistent banner under the Mini Dashboard header; if the Mini Dashboard is closed when the market enters an alert zone, IRS shows a temporary splash notification instead. Savings Projects and Reserve Funds can be collapsed independently. Right-click the minimap button or use /irs mini to toggle it. Its position, size, collapse states, and per-character open state are saved, and Settings can optionally auto-open it on login."
     },
     {
         "SAVINGS PROJECTS",
@@ -787,6 +899,7 @@ end
 function IRS:RefreshToolsPage()
     EnsureToolsDB()
     LayoutManual()
+    RefreshDailyAdjustmentInfo()
 end
 
 function IRS:RefreshProjectAllocationPage()

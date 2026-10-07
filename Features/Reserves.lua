@@ -60,6 +60,7 @@ end
 
 local function MakeButton(parent, text, x, y, width, onClick)
     local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    IRS:StyleButtonFeedback(button)
     button:SetPoint("TOPLEFT", x, y)
     button:SetSize(width, 28)
     button:SetBackdrop({
@@ -728,6 +729,7 @@ chart.zeroLabel = MakeText(chart, "helper", COLORS.muted, "RIGHT"); chart.zeroLa
 chart.bars = {}
 for i = 1, 30 do
     local slot = CreateFrame("Button", nil, chart)
+    IRS:StyleButtonFeedback(slot)
     slot:SetHeight(230)
     slot.bar = slot:CreateTexture(nil, "ARTWORK")
     slot.bar:SetTexture("Interface/Buttons/WHITE8X8")
@@ -781,6 +783,7 @@ end
 local function EnsurePopupRow(container, child, index, width)
     if container.rows[index] then return container.rows[index] end
     local row = CreateFrame("Button", nil, child, "BackdropTemplate")
+    IRS:StyleButtonFeedback(row)
     row:SetHeight(26); row:SetWidth(width)
     row:SetBackdrop({bgFile = "Interface/Buttons/WHITE8X8"})
     row:SetBackdropColor(0.15, 0.115, 0.070, 0.65)
@@ -864,6 +867,7 @@ local sourceChoices = {
 }
 for i, choice in ipairs(sourceChoices) do
     local row = CreateFrame("Button", nil, sourcePopup, "BackdropTemplate")
+    IRS:StyleButtonFeedback(row)
     row:SetPoint("TOPLEFT", 4, -4 - ((i - 1) * 28)); row:SetSize(182, 26)
     row:SetBackdrop({bgFile="Interface/Buttons/WHITE8X8"}); row:SetBackdropColor(0.15,0.115,0.070,0.65)
     row.text = MakeText(row, "helper", COLORS.text, "LEFT"); row.text:SetPoint("LEFT", 8, 0); row.text:SetText(choice.label)
