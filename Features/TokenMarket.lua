@@ -262,6 +262,151 @@ local function StatusColor(status)
     return COLORS.muted
 end
 
+local TOKEN_ALERT_STATUSES = {
+    ["GOOD BUY"] = true,
+    ["EXTREME BUY"] = true,
+    ["GOOD SELL"] = true,
+    ["EXTREME SELL"] = true,
+}
+
+local function IsTokenAlertStatus(status)
+    return TOKEN_ALERT_STATUSES[tostring(status or "")] == true
+end
+
+function IRS:IsTokenAlertStatus(status)
+    return IsTokenAlertStatus(status)
+end
+
+-- Dedicated visual Token alert shown when the Mini Dashboard is not open.
+local tokenSplash = MakePanel(UIParent, COLORS.panelAlt)
+tokenSplash:SetSize(460, 116)
+tokenSplash:SetPoint("TOP", UIParent, "TOP", 0, -165)
+tokenSplash:SetFrameStrata("DIALOG")
+tokenSplash:SetClampedToScreen(true)
+tokenSplash:Hide()
+
+tokenSplash.title = MakeText(
+    tokenSplash,
+    "section",
+    COLORS.goldSoft,
+    "CENTER",
+    "OUTLINE"
+)
+tokenSplash.title:SetPoint("TOPLEFT", 20, -16)
+tokenSplash.title:SetPoint("TOPRIGHT", -20, -16)
+
+tokenSplash.action = MakeText(
+    tokenSplash,
+    "label",
+    COLORS.text,
+    "CENTER"
+)
+tokenSplash.action:SetPoint("TOPLEFT", 20, -48)
+tokenSplash.action:SetPoint("TOPRIGHT", -20, -48)
+
+tokenSplash.detail = MakeText(
+    tokenSplash,
+    "helper",
+    COLORS.muted,
+    "CENTER"
+)
+tokenSplash.detail:SetPoint("TOPLEFT", 20, -76)
+tokenSplash.detail:SetPoint("TOPRIGHT", -20, -76)
+
+local tokenSplashClose = CreateFrame(
+    "Button",
+    nil,
+    tokenSplash,
+    "UIPanelCloseButton"
+)
+tokenSplashClose:SetPoint("TOPRIGHT", -2, -2)
+
+local tokenSplashGeneration = 0
+
+local function HideTokenSplash()
+    tokenSplashGeneration = tokenSplashGeneration + 1
+    tokenSplash:Hide()
+end
+
+tokenSplashClose:SetScript("OnClick", HideTokenSplash)
+
+local function ShowTokenSplash(summary)
+    if not summary or not IsTokenAlertStatus(summary.status) then
+        HideTokenSplash()
+        return
+    end
+
+    local market = IRS:EnsureTokenMarketDB()
+    local settings = market.settings
+    local isBuy = summary.status == "GOOD BUY"
+        or summary.status == "EXTREME BUY"
+    local action = isBuy and "BUY WITH GOLD" or "SELL FOR GOLD"
+    local color = StatusColor(summary.status)
+
+    tokenSplash.title:SetText(
+        "WOW TOKEN ALERT — " .. tostring(summary.status)
+    )
+    SetColor(tokenSplash.title, color)
+
+    tokenSplash.action:SetText(action)
+    SetColor(tokenSplash.action, color)
+
+    tokenSplash.detail:SetText(
+        string.format(
+            "%s  •  %+.1f%% vs %d-day average",
+            IRS:FormatMoney(summary.current or 0, true),
+            summary.differencePercent or 0,
+            tonumber(settings.averageDays) or 7
+        )
+    )
+
+    tokenSplash:SetBackdropBorderColor(
+        color[1],
+        color[2],
+        color[3],
+        color[4] or 1
+    )
+
+    tokenSplashGeneration = tokenSplashGeneration + 1
+    local generation = tokenSplashGeneration
+
+    tokenSplash:Show()
+
+    C_Timer.After(9, function()
+        if generation == tokenSplashGeneration then
+            tokenSplash:Hide()
+        end
+    end)
+end
+
+-- Routes the Screen alert to the Mini Dashboard when it is open; otherwise
+-- use the temporary general splash notification.
+function IRS:ShowTokenVisualAlert(summary)
+    local market = IRS:EnsureTokenMarketDB()
+
+    if market.settings.screenAlert == false then
+        return false
+    end
+
+    summary = summary or IRS:GetTokenMarketSummary()
+
+    if not summary or not IsTokenAlertStatus(summary.status) then
+        return false
+    end
+
+    local miniOpen = IRS.miniDashboardFrame
+        and IRS.miniDashboardFrame:IsShown()
+
+    if miniOpen and IRS.RefreshMiniTokenAlert then
+        HideTokenSplash()
+        IRS:RefreshMiniTokenAlert(summary)
+    else
+        ShowTokenSplash(summary)
+    end
+
+    return true
+end
+
 local function AlertIfNeeded(summary)
     local market = IRS:EnsureTokenMarketDB()
     local settings = market.settings
@@ -293,9 +438,8 @@ local function AlertIfNeeded(summary)
         DEFAULT_CHAT_FRAME:AddMessage("|cFFD1B06B" .. message .. "|r")
     end
 
-    if settings.screenAlert and UIErrorsFrame then
-        local c = StatusColor(status)
-        UIErrorsFrame:AddMessage(message, c[1], c[2], c[3], 1)
+    if settings.screenAlert then
+        IRS:ShowTokenVisualAlert(summary)
     end
 
     if settings.soundAlert and PlaySound then
@@ -334,6 +478,14 @@ function IRS:CaptureTokenMarketPrice()
 
     local summary = IRS:GetTokenMarketSummary()
     AlertIfNeeded(summary)
+
+    if not IsTokenAlertStatus(summary.status) then
+        HideTokenSplash()
+    end
+
+    if IRS.RefreshMiniTokenAlert then
+        IRS:RefreshMiniTokenAlert(summary)
+    end
 
     if IRS.RefreshTokenDashboardCard then
         IRS:RefreshTokenDashboardCard()
@@ -407,6 +559,14 @@ function IRS:SetTokenMarketSetting(key, value)
     end
     if s.extremeSellPercent < s.sellPercent then
         s.extremeSellPercent = s.sellPercent
+    end
+
+    if IRS.RefreshMiniTokenAlert then
+        IRS:RefreshMiniTokenAlert(IRS:GetTokenMarketSummary())
+    end
+
+    if key == "screenAlert" and s.screenAlert == false then
+        HideTokenSplash()
     end
 
     ScheduleNext()
