@@ -609,6 +609,10 @@ function IRS:EnsureDB()
         db.settings.miniDashboardAnchor = "TOPLEFT"
     end
 
+    -- Which net-gold statistics appear in the floating Mini Dashboard.
+    -- Missing entries intentionally mean "shown" so existing users keep all rows.
+    db.settings.miniStatVisibility = db.settings.miniStatVisibility or {}
+
     -- Per-project visibility for the floating mini dashboard.
     -- Missing entries intentionally mean "shown" so old and newly-created
     -- projects appear by default until the player opts them out.
@@ -3222,6 +3226,53 @@ end
 -- ============================================================================
 -- Returns whether one savings project is allowed to appear in the floating
 -- mini dashboard. A project is visible by default unless explicitly disabled.
+local MINI_STAT_KEYS = {
+    character = true,
+    today = true,
+    week = true,
+    month = true,
+    total = true,
+}
+
+-- Returns whether one net-gold statistic is shown in the Mini Dashboard.
+-- Missing entries default to visible.
+function IRS:IsMiniStatShown(statKey)
+    if not IRS.db then IRS:EnsureDB() end
+
+    statKey = tostring(statKey or "")
+    if not MINI_STAT_KEYS[statKey] then
+        return false
+    end
+    IRS.db.settings.miniStatVisibility =
+        IRS.db.settings.miniStatVisibility or {}
+
+    return IRS.db.settings.miniStatVisibility[statKey] ~= false
+end
+
+-- Saves one Mini Dashboard net-gold statistic visibility choice.
+function IRS:SetMiniStatVisibility(statKey, enabled)
+    if not IRS.db then IRS:EnsureDB() end
+
+    statKey = tostring(statKey or "")
+    if not MINI_STAT_KEYS[statKey] then
+        return
+    end
+
+    IRS.db.settings.miniStatVisibility =
+        IRS.db.settings.miniStatVisibility or {}
+
+    IRS.db.settings.miniStatVisibility[statKey] =
+        enabled and true or false
+
+    if IRS.RefreshMiniDashboard then
+        IRS:RefreshMiniDashboard()
+    end
+
+    if IRS.RefreshSettingsPage then
+        IRS:RefreshSettingsPage()
+    end
+end
+
 function IRS:IsProjectShownInMini(projectId)
     if not IRS.db then IRS:EnsureDB() end
     IRS.db.settings.miniProjectVisibility = IRS.db.settings.miniProjectVisibility or {}

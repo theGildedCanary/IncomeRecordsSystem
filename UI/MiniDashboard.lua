@@ -352,11 +352,11 @@ miniPeriods.bottomLine = AddDivider(miniPeriods, "BOTTOMLEFT", "BOTTOMLEFT", 0, 
 
 local miniPeriodRows = {}
 local miniPeriodLabels = {
-    {"Character Today", "today", "character"},
-    {"Today", "today", "account"},
-    {"This Week", "week", "account"},
-    {"This Month", "month", "account"},
-    {"Total Recorded", "total", "account"},
+    {"Character Today", "today", "character", "character"},
+    {"Today", "today", "account", "today"},
+    {"This Week", "week", "account", "week"},
+    {"This Month", "month", "account", "month"},
+    {"Total Recorded", "total", "account", "total"},
 }
 
 for i, info in ipairs(miniPeriodLabels) do
@@ -376,6 +376,7 @@ for i, info in ipairs(miniPeriodLabels) do
 
     row.key = info[2]
     row.scope = info[3]
+    row.visibilityKey = info[4]
 
     if i < #miniPeriodLabels then
         row.divider = row:CreateTexture(nil, "BORDER")
@@ -631,6 +632,8 @@ function IRS:RefreshMiniDashboard()
     local characterName = UnitName("player") or "Character"
 
     for _, row in ipairs(miniPeriodRows) do
+        row.shouldShow = IRS:IsMiniStatShown(row.visibilityKey)
+        row:SetShown(row.shouldShow)
         if row.scope == "character" then
             row.label:SetText(characterName .. "'s Net Today")
         end
@@ -812,20 +815,63 @@ function IRS:RefreshMiniDashboard()
     miniPeriods:SetPoint("TOPLEFT", miniHeader, "BOTTOMLEFT", 2, -6)
     miniPeriods:SetPoint("TOPRIGHT", miniHeader, "BOTTOMRIGHT", -2, -6)
 
-    local periodRowHeight = math.max(23, math.max(bodySize, valueSize) + 9)
-    miniPeriods:SetHeight((periodRowHeight * #miniPeriodRows) + 10)
+    local visiblePeriodRows = {}
 
-    for i, row in ipairs(miniPeriodRows) do
+    for _, row in ipairs(miniPeriodRows) do
+        if row.shouldShow then
+            table.insert(visiblePeriodRows, row)
+        end
+    end
+
+    local visiblePeriodCount = #visiblePeriodRows
+    miniPeriods:SetShown(visiblePeriodCount > 0)
+
+    local periodRowHeight = math.max(23, math.max(bodySize, valueSize) + 9)
+    miniPeriods:SetHeight((periodRowHeight * visiblePeriodCount) + 10)
+
+    for i, row in ipairs(visiblePeriodRows) do
         row:ClearAllPoints()
         row:SetPoint("TOPLEFT", 8, -5 - ((i - 1) * periodRowHeight))
         row:SetPoint("TOPRIGHT", -8, -5 - ((i - 1) * periodRowHeight))
         row:SetHeight(periodRowHeight)
+        if row.divider then
+            row.divider:SetShown(i < visiblePeriodCount)
+        end
     end
 
     local projectsHeaderHeight = math.max(24, heading2Size + 11)
     miniProjectsHeader:ClearAllPoints()
-    miniProjectsHeader:SetPoint("TOPLEFT", miniPeriods, "BOTTOMLEFT", 3, -7)
-    miniProjectsHeader:SetPoint("TOPRIGHT", miniPeriods, "BOTTOMRIGHT", -3, -7)
+    if visiblePeriodCount > 0 then
+        miniProjectsHeader:SetPoint(
+            "TOPLEFT",
+            miniPeriods,
+            "BOTTOMLEFT",
+            3,
+            -7
+        )
+        miniProjectsHeader:SetPoint(
+            "TOPRIGHT",
+            miniPeriods,
+            "BOTTOMRIGHT",
+            -3,
+            -7
+        )
+    else
+        miniProjectsHeader:SetPoint(
+            "TOPLEFT",
+            miniHeader,
+            "BOTTOMLEFT",
+            3,
+            -7
+        )
+        miniProjectsHeader:SetPoint(
+            "TOPRIGHT",
+            miniHeader,
+            "BOTTOMRIGHT",
+            -3,
+            -7
+        )
+    end
     miniProjectsHeader:SetHeight(projectsHeaderHeight)
 
     miniProjectsBody:ClearAllPoints()
@@ -883,7 +929,8 @@ function IRS:RefreshMiniDashboard()
     end
 
     -- Reserve section begins after whichever project element is actually last.
-    local reserveAnchor = miniPeriods
+    local reserveAnchor =
+        visiblePeriodCount > 0 and miniPeriods or miniHeader
     if showProjects then
         if showAggregate then reserveAnchor = miniProjectsSummary
         elseif miniProjectsMore:IsShown() then reserveAnchor = miniProjectsMore
@@ -919,21 +966,25 @@ function IRS:RefreshMiniDashboard()
         and (7 + reserveHeaderHeight + (reservesCollapsed and 10 or (2 + reserveBodyHeight + 10)))
         or 0
 
+    local periodsExtraHeight = visiblePeriodCount > 0
+        and (6 + miniPeriods:GetHeight())
+        or 0
+
     local frameHeight
 
     if not showProjects then
-        frameHeight = 7 + headerHeight + 6 + miniPeriods:GetHeight() + 12 + reserveExtraHeight
+        frameHeight = 7 + headerHeight + periodsExtraHeight + 12 + reserveExtraHeight
 
     elseif collapsed then
-        frameHeight = 7 + headerHeight + 6 + miniPeriods:GetHeight()
+        frameHeight = 7 + headerHeight + periodsExtraHeight
             + 7 + projectsHeaderHeight + 10 + reserveExtraHeight
 
     elseif #projects == 0 then
-        frameHeight = 7 + headerHeight + 6 + miniPeriods:GetHeight()
+        frameHeight = 7 + headerHeight + periodsExtraHeight
             + 7 + projectsHeaderHeight + 2 + moreHeight + 18 + reserveExtraHeight
 
     else
-        frameHeight = 7 + headerHeight + 6 + miniPeriods:GetHeight()
+        frameHeight = 7 + headerHeight + periodsExtraHeight
             + 7 + projectsHeaderHeight + 2 + shownBodyHeight
             + moreHeight
             + (showAggregate and (summaryHeight + 8) or 0)
@@ -990,7 +1041,7 @@ local function RestoreMiniDashboardOpenState()
         IRS:EnsureDB()
     end
 
-    if IRS.db.settings.autoOpenMiniDashboard == true then  
+    if IRS.db.settings.autoOpenMiniDashboard == true then
         IRS:ShowMiniDashboard()
         return
     end
@@ -998,7 +1049,7 @@ local function RestoreMiniDashboardOpenState()
     local savedStates = IRS.db.ui
         and IRS.db.ui.miniDashboard
         and IRS.db.ui.miniDashboard.characterOpenState
-    
+
     local characterKey = IRS:CharacterKey()
 
     if savedStates and savedStates[characterKey] == true then

@@ -315,8 +315,57 @@ for i, choice in ipairs(anchorChoices) do
     anchorButtons[choice.key] = button
 end
 
+local statsPanel = MakePanel(mini, COLORS.panelAlt)
+statsPanel:SetPoint("TOPLEFT", anchorPanel, "BOTTOMLEFT", 0, -12)
+statsPanel:SetPoint("TOPRIGHT", anchorPanel, "BOTTOMRIGHT", 0, -12)
+statsPanel:SetHeight(92)
+
+local statsTitle = MakeText(statsPanel, 13, COLORS.goldSoft, "LEFT")
+statsTitle:SetPoint("TOPLEFT", 12, -11)
+statsTitle:SetText("STATS SHOWN")
+
+local statsDesc = MakeText(statsPanel, 8, COLORS.muted, "LEFT")
+statsDesc:SetPoint("TOPLEFT", statsTitle, "BOTTOMLEFT", 0, -6)
+statsDesc:SetPoint("RIGHT", -12, 0)
+statsDesc:SetText("Choose which net-gold rows appear at the top of the Mini Dashboard.")
+
+local miniStatChecks = {}
+local miniStatChoices = {
+    { key = "character", label = "Character" },
+    { key = "today", label = "Today" },
+    { key = "week", label = "Week" },
+    { key = "month", label = "Month" },
+    { key = "total", label = "Total" },
+}
+
+for i, choice in ipairs(miniStatChoices) do
+    local check = CreateFrame(
+        "CheckButton",
+        nil,
+        statsPanel,
+        "UICheckButtonTemplate"
+    )
+
+    check:SetSize(28, 28)
+    check:SetPoint("BOTTOMLEFT", 12 + ((i - 1) * 115), 10)
+    check.statKey = choice.key
+
+    local label = MakeText(statsPanel, 10, COLORS.text, "LEFT")
+    label:SetPoint("LEFT", check, "RIGHT", 2, 0)
+    label:SetText(choice.label)
+
+    check:SetScript("OnClick", function(self)
+        IRS:SetMiniStatVisibility(
+            self.statKey,
+            self:GetChecked()
+        )
+    end)
+
+    miniStatChecks[choice.key] = check
+end
+
 local projectsPanel = MakePanel(mini, COLORS.panelAlt)
-projectsPanel:SetPoint("TOPLEFT", 14, -280)
+projectsPanel:SetPoint("TOPLEFT", statsPanel, "BOTTOMLEFT", 0, -12)
 projectsPanel:SetPoint("BOTTOMRIGHT", -14, 14)
 
 local projectsTitle = MakeText(projectsPanel, 13, COLORS.goldSoft, "LEFT")
@@ -638,8 +687,25 @@ local function LayoutSettingsForFonts()
         button:SetPoint("BOTTOMLEFT", 12 + ((i - 1) * 145), 12)
     end
 
+    statsPanel:ClearAllPoints()
+    statsPanel:SetPoint("TOPLEFT", anchorPanel, "BOTTOMLEFT", 0, -12)
+    statsPanel:SetPoint("TOPRIGHT", anchorPanel, "BOTTOMRIGHT", 0, -12)
+    statsPanel:SetHeight(
+        math.max(92, sectionSize + helper + bodySize + 46)
+    )
+
+    statsDesc:ClearAllPoints()
+    statsDesc:SetPoint("TOPLEFT", statsTitle, "BOTTOMLEFT", 0, -6)
+    statsDesc:SetPoint("RIGHT", -12, 0)
+
+    for i, choice in ipairs(miniStatChoices) do
+        local check = miniStatChecks[choice.key]
+        check:ClearAllPoints()
+        check:SetPoint("BOTTOMLEFT", 12 + ((i - 1) * 115), 10)
+    end
+
     projectsPanel:ClearAllPoints()
-    projectsPanel:SetPoint("TOPLEFT", anchorPanel, "BOTTOMLEFT", 0, -12)
+    projectsPanel:SetPoint("TOPLEFT", statsPanel, "BOTTOMLEFT", 0, -12)
     projectsPanel:SetPoint("BOTTOMRIGHT", mini, "BOTTOMRIGHT", -14, 14)
 
     projectsDesc:ClearAllPoints()
@@ -702,6 +768,11 @@ function IRS:RefreshSettingsPage()
     minimapCheck:SetChecked(IRS.db.settings.showMinimapButton ~= false)
     miniAutoOpenCheck:SetChecked(IRS.db.settings.autoOpenMiniDashboard == true)
     miniProjectsCheck:SetChecked(IRS.db.settings.showMiniProjects ~= false)
+    for _, choice in ipairs(miniStatChoices) do
+        miniStatChecks[choice.key]:SetChecked(
+            IRS:IsMiniStatShown(choice.key)
+        )
+    end
 
     if IRS.RefreshInternalTransferSettingsSection then
         IRS:RefreshInternalTransferSettingsSection()
