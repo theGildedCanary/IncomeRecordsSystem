@@ -15,7 +15,7 @@ The attached release ZIP is the packaged addon intended for installation. GitHub
 - Tracks observed net gold movement: income adds to the ledger and spending subtracts from it.
 - Maintains account-wide and per-character day, week, month, and total history.
 - Displays Blizzard lifetime Wealth statistics separately from IRS-observed history.
-- Supports **Savings Projects** with targets, deadlines, funding sources, allocation percentages, checkpoints, daily progress, and trajectory graphs.
+- Supports **Savings Projects** with targets, deadlines, funding sources, daily allocation splits, checkpoints, daily progress, and trajectory graphs. Changing a split affects future attributed source changes without reallocating gold already attributed to a project.
 - Supports **Reserve Funds** for balances you want to maintain rather than spend down.
 - Filters transfers between owned storage locations so moving your own gold does not count as profit or loss.
 - Includes a floating **Mini Dashboard** for earnings, Savings Projects, and Reserve Funds.

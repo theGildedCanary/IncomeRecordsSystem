@@ -2347,10 +2347,24 @@ function IRS:GetProjectSourceBalance(project)
     return 0, false, "Unknown Source"
 end
 
--- Applies the project's allocation percentage to its selected source balance.
--- Example: 25% of a 4m Warband Bank = 1m allocated to this project view.
+-- Returns the project's attributed balance. The initial balance is seeded at
+-- its opening split; later allocation changes only apply to source changes,
+-- never to gold already attributed to the project.
 function IRS:GetProjectAllocatedBalance(project)
     local sourceBalance, available, label = IRS:GetProjectSourceBalance(project)
+    local projectItems = IRS.db and IRS.db.projects and IRS.db.projects.items
+    local tracksProjectHistory = type(project) == "table"
+        and project.id ~= nil
+        and projectItems
+        and (projectItems[project.id] == project or projectItems[tostring(project.id)] == project)
+    local history = available and tracksProjectHistory and IRS.GetProjectSourceHistory
+        and IRS:GetProjectSourceHistory(project, false, true)
+        or nil
+    local lastDay = history and history[#history]
+    if available and lastDay then
+        return math.max(0, math.floor(tonumber(lastDay.ending) or 0)), available, label, sourceBalance
+    end
+
     local pct = tonumber(project and project.allocationPercent) or 100
     pct = math.max(0, math.min(100, pct))
     return math.floor(sourceBalance * (pct / 100)), available, label, sourceBalance
@@ -2608,7 +2622,7 @@ function IRS:EnsureProjectSourceHistoryMigration()
     IRS.db.migrations.projectSourceHistory150 = ServerNow()
 end
 
-function IRS:GetProjectSourceHistory(projectId, descending)
+function IRS:GetProjectSourceHistory(projectId, descending, includePastDeadline)
     local project = type(projectId) == "table" and projectId or IRS:GetProject(projectId)
     local rows = {}
     if not project then return rows end
@@ -2616,10 +2630,13 @@ function IRS:GetProjectSourceHistory(projectId, descending)
     IRS:EnsureProjectSourceHistoryMigration()
     IRS:CaptureDailySourceHistory()
 
-    local startDate = project.startDate or project.createdDay or CurrentDateKey()
-    local endDate = project.deadline or CurrentDateKey()
     local today = CurrentDateKey()
-    if endDate > today then endDate = today end
+    local startDate = project.startDate or project.createdDay or today
+    local endDate = today
+    if not includePastDeadline then
+        endDate = project.deadline or today
+        if endDate > today then endDate = today end
+    end
 
     for dayKey, day in pairs(IRS.db.sourceHistory.days or {}) do
         if dayKey >= startDate and dayKey <= endDate then
@@ -2628,18 +2645,12 @@ function IRS:GetProjectSourceHistory(projectId, descending)
                 local id = ProjectSourceHistoryId(config.sourceType, config.sourceKey)
                 local source = day.sources and day.sources[id]
                 if source then
-                    local pct = (tonumber(config.allocationPercent) or 100) / 100
                     local rawStart = tonumber(source.start) or tonumber(source.ending) or 0
                     local rawEnd = tonumber(source.ending) or rawStart
-                    local allocatedStart = math.floor(rawStart * pct)
-                    local allocatedEnd = math.floor(rawEnd * pct)
 
                     table.insert(rows, {
                         key = dayKey,
                         label = dayKey,
-                        start = allocatedStart,
-                        ending = allocatedEnd,
-                        change = allocatedEnd - allocatedStart,
                         sourceStart = rawStart,
                         sourceEnding = rawEnd,
                         sourceType = config.sourceType,
@@ -2648,6 +2659,38 @@ function IRS:GetProjectSourceHistory(projectId, descending)
                     })
                 end
             end
+        end
+    end
+
+    table.sort(rows, function(a, b) return a.key < b.key end)
+
+    if #rows > 0 then
+        local openingPercent = tonumber(project.openingAllocationPercent)
+        if openingPercent == nil then
+            openingPercent = tonumber(rows[1].allocationPercent) or 100
+            project.openingAllocationPercent = openingPercent
+        end
+        local first = rows[1]
+        local balance = math.floor(
+            (tonumber(first.sourceStart) or 0)
+                * math.max(0, math.min(100, openingPercent)) / 100
+        )
+
+        for _, row in ipairs(rows) do
+            local rawStart = tonumber(row.sourceStart) or 0
+            local rawEnd = tonumber(row.sourceEnding) or rawStart
+            local percent = math.max(0, math.min(100, tonumber(row.allocationPercent) or 100))
+            local allocatedChange = (rawEnd - rawStart) * percent / 100
+            if allocatedChange < 0 then
+                allocatedChange = math.ceil(allocatedChange - 0.5)
+            else
+                allocatedChange = math.floor(allocatedChange + 0.5)
+            end
+
+            row.start = balance
+            balance = math.max(0, balance + allocatedChange)
+            row.ending = balance
+            row.change = row.ending - row.start
         end
     end
 
@@ -2698,6 +2741,17 @@ function IRS:SetProjectAllocationPercent(projectId, value)
     EnsureProjectConfigHistory(project)
 
     local oldAllocation = tonumber(project.allocationPercent) or 100
+    if project.openingAllocationPercent == nil then
+        if project.openingBalancePending then
+            project.openingAllocationPercent = value
+            project.openingBalancePending = nil
+        else
+            project.openingAllocationPercent =
+                tonumber(project.configHistory[1] and project.configHistory[1].allocationPercent)
+                or oldAllocation
+        end
+    end
+
     if oldAllocation == value then
         return true, project
     end
@@ -2801,6 +2855,7 @@ function IRS:CreateProject(data)
         sourceType = data.sourceType or "account",
         sourceKey = data.sourceKey,
         allocationPercent = allocation,
+        openingBalancePending = true,
         graphInterval = "daily",
         checkpoints = {},
         nextCheckpointId = 1,
@@ -3109,7 +3164,7 @@ function IRS:GetProjectDailyGoalStatus(projectId)
     IRS:UpdateProjectSnapshot(project)
 
     local todayKey = CurrentDateKey()
-    local rows = IRS:GetProjectSourceHistory(project, false)
+    local rows = IRS:GetProjectSourceHistory(project, false, true)
     local day
     for _, row in ipairs(rows) do
         if row.key == todayKey then

@@ -13,6 +13,7 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 
 ### Changed
 
+- Project allocation splits now apply to daily source changes instead of reassigning each project's entire current source balance; changing a split no longer moves the Mini Dashboard's fixed daily requirement.
 - Savings Projects now use separate Project Management and Allocation tabs.
 - Profit Distribution moved from Tools into Savings Projects > Allocation.
 - Each Savings Project now has its own linked Distribution % slider; changing one slider automatically redistributes the remaining percentage across the other Projects so Project Distribution always totals 100%.

@@ -478,11 +478,11 @@ local MANUAL_SECTIONS = {
     },
     {
         "SAVINGS PROJECTS",
-        "Savings Projects now have two tabs. Project Management stores the goal itself: name, target, Start Date, Deadline, funding source, checkpoints, progress, and history. Allocation is account-wide planning: every Project has a linked whole-number Distribution % slider and the Project sliders always total 100%. Project Management no longer has an editable Allocation % field. The calculated Split % from the Allocation tab is what IRS uses when attributing a shared source balance to each Project."
+        "Savings Projects now have two tabs. Project Management stores the goal itself: name, target, Start Date, Deadline, funding source, checkpoints, progress, and history. Allocation is account-wide planning: every Project has a linked whole-number Distribution % slider and the Project sliders always total 100%. Project Management no longer has an editable Allocation % field. The opening Split % attributes the starting source balance; each day's Split % applies only to that day's source change, so changing Distribution does not reassign previously attributed gold."
     },
     {
         "PROJECT HISTORY & CHECKPOINTS",
-        "The Daily tracker reads historical source balances inside the Project's Start Date to Deadline window. Trajectory compares actual allocated balance against the required path toward the target. Daily, Weekly, Monthly, and Checkpoint graph modes change how the same underlying history is presented. Custom checkpoints are named gold milestones inside the Project; they do not move gold."
+        "The Daily tracker reads historical source changes inside the Project's Start Date to Deadline window and accumulates each day's Project Split into an attributed balance. Trajectory compares that balance against the required path toward the target. Daily, Weekly, Monthly, and Checkpoint graph modes change how the same underlying history is presented. Custom checkpoints are named gold milestones inside the Project; they do not move gold."
     },
     {
         "RESERVE FUNDS",
