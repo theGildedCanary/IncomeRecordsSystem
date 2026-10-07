@@ -2680,6 +2680,63 @@ function IRS:GetProject(projectId)
     return IRS.db.projects.items[projectId] or IRS.db.projects.items[tostring(projectId)]
 end
 
+-- Saves one Project Allocation % change without rewriting earlier source
+-- history. Profit Distribution uses this same value so Projects and the
+-- distributor cannot silently disagree about the active savings split.
+function IRS:SetProjectAllocationPercent(projectId, value)
+    if not IRS.db then IRS:EnsureDB() end
+
+    local project = type(projectId) == "table" and projectId or IRS:GetProject(projectId)
+    if not project then return false, "Project not found." end
+
+    value = tonumber(value)
+    if not value then return false, "Allocation must be a number." end
+
+    value = math.max(0, math.min(100, value))
+    value = math.floor((value * 10) + 0.5) / 10
+
+    EnsureProjectConfigHistory(project)
+
+    local oldAllocation = tonumber(project.allocationPercent) or 100
+    if oldAllocation == value then
+        return true, project
+    end
+
+    project.allocationPercent = value
+
+    local todayKey = CurrentDateKey()
+    local now = ServerNow()
+    local latestToday
+
+    -- Configuration history is day-granular. Repeated edits on the same day
+    -- should update today's rule rather than piling up equivalent records.
+    for i = #project.configHistory, 1, -1 do
+        local config = project.configHistory[i]
+        if tostring(config.effectiveDay or "") == todayKey then
+            latestToday = config
+            break
+        end
+    end
+
+    if latestToday
+        and (latestToday.sourceType or "account") == (project.sourceType or "account")
+        and latestToday.sourceKey == project.sourceKey then
+        latestToday.allocationPercent = value
+        latestToday.changedAt = now
+    else
+        table.insert(project.configHistory, {
+            effectiveDay = todayKey,
+            changedAt = now,
+            sourceType = project.sourceType or "account",
+            sourceKey = project.sourceKey,
+            allocationPercent = value,
+        })
+    end
+
+    IRS:UpdateProjectSnapshot(project)
+    return true, project
+end
+
 -- Records today's observed source balance for a Project.
 function IRS:UpdateProjectSnapshot(project)
     if not project then return end
@@ -3104,12 +3161,12 @@ function IRS:GetProjectDailyGoalStatus(projectId)
 end
 
 
--- Adds together TODAY'S fixed daily goals and observed progress for every
--- project the player has selected for the floating mini dashboard.
+-- Adds together TODAY'S fixed daily goals and actual allocated source changes
+-- for every project the player has selected for the floating mini dashboard.
 --
 -- Important:
 --   * This includes ALL selected projects, not only the first five visible rows.
---   * Project allocation percentages are respected before values are summed.
+--   * Each project's observed change already respects its Allocation %.
 --   * If allocations intentionally overlap, the aggregate follows those
 --     configured allocations as written.
 --   * Unavailable project sources are excluded from the numeric total and
@@ -3118,7 +3175,7 @@ function IRS:GetMiniProjectDailySummary()
     if not IRS.db then IRS:EnsureDB() end
 
     local totalNeeded = 0
-    local totalNet = IRS:GetCurrentEarnings().today or 0
+    local totalChange = 0
     local trackedCount = 0
     local availableCount = 0
     local unavailableCount = 0
@@ -3131,20 +3188,21 @@ function IRS:GetMiniProjectDailySummary()
             if daily and daily.available then
                 availableCount = availableCount + 1
                 totalNeeded = totalNeeded + math.max(0, tonumber(daily.dailyGoal) or 0)
+                totalChange = totalChange + (tonumber(daily.todayChange) or 0)
             else
                 unavailableCount = unavailableCount + 1
             end
         end
     end
 
-    local difference = totalNet - totalNeeded
+    local difference = totalChange - totalNeeded
 
     return {
         trackedCount = trackedCount,
         availableCount = availableCount,
         unavailableCount = unavailableCount,
         dailyNeeded = totalNeeded,
-        todayChange = totalNet,
+        todayChange = totalChange,
         difference = difference,
         met = availableCount > 0 and difference >= 0,
     }

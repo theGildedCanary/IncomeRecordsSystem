@@ -14,10 +14,14 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 ### Changed
 
 - Profit Distribution now allocates net profit across active Savings Projects only; Reserve Funds no longer dilute Project distribution percentages.
+- Profit Distribution and Savings Projects now share one authoritative Allocation % per Project instead of maintaining separate calculator weights.
+- Distribution totals below 100% now intentionally leave the unused share unallocated; totals above 100% are scaled only for the calculator suggestion so IRS never recommends moving more gold than is available.
 
 ### Fixed
 
 - Fixed Savings Project distribution percentages being normalized together with Reserve Fund percentages, which could make shared Guild Bank Project splits appear not to tally correctly.
+- Fixed the Mini Dashboard Daily Gold Target comparing Project requirements against account-wide net income instead of the selected Projects' actual allocated source changes.
+- Existing saved Profit Distribution percentages are migrated into their matching Projects so current splits are preserved when upgrading.
 
 ### Removed
 

@@ -35,20 +35,32 @@ local function EnsureToolsDB()
     IRS.db.tools = IRS.db.tools or {}
     IRS.db.tools.distribution = IRS.db.tools.distribution or {}
     IRS.db.tools.distribution.history = IRS.db.tools.distribution.history or {}
-    IRS.db.tools.distribution.weights = IRS.db.tools.distribution.weights or {}
 
-    -- Profit Distribution is for Savings Projects only. Reserve Funds maintain
-    -- standing balances and should not compete with project savings percentages.
-    for goalId in pairs(IRS.db.tools.distribution.weights) do
-        if tostring(goalId):match("^reserve:") then
-            IRS.db.tools.distribution.weights[goalId] = nil
+    local state = IRS.db.tools.distribution
+    IRS.db.migrations = IRS.db.migrations or {}
+
+    -- v1.1.1: the Profit Distributor no longer owns a second set of Project
+    -- percentages. Migrate any saved calculator values into the Projects once,
+    -- then use project.allocationPercent as the single source of truth.
+    if not IRS.db.migrations.profitDistributionProjectAuthority111 then
+        for goalId, savedWeight in pairs(state.weights or {}) do
+            local projectId = tostring(goalId):match("^project:(.+)$")
+            if projectId and IRS.SetProjectAllocationPercent then
+                IRS:SetProjectAllocationPercent(
+                    tonumber(projectId) or projectId,
+                    savedWeight
+                )
+            end
         end
+
+        IRS.db.migrations.profitDistributionProjectAuthority111 = Now()
     end
+
+    state.weights = nil
 
     IRS.db.ui = IRS.db.ui or {}
     IRS.db.ui.toolsSection = IRS.db.ui.toolsSection or "manual"
 
-    local state = IRS.db.tools.distribution
     if state.baselineTotal == nil then
         local earnings = IRS:GetCurrentEarnings()
         local total = math.floor(tonumber(earnings.total) or 0)
@@ -81,13 +93,12 @@ function IRS:GetProfitDistributionGoals()
                 elseif (tonumber(stats.remaining) or 0) > 0 then
                     local goalId = "project:" .. tostring(entry.id)
                     local defaultWeight = math.max(0, tonumber(project.allocationPercent) or 0)
-                    local savedWeight = state.weights[goalId]
                     table.insert(rows, {
                         id = goalId,
                         objectId = entry.id,
                         kind = "PROJECT",
                         name = project.name or "Savings Project",
-                        weight = savedWeight ~= nil and math.max(0, tonumber(savedWeight) or 0) or defaultWeight,
+                        weight = defaultWeight,
                         defaultWeight = defaultWeight,
                         need = math.max(0, math.floor(tonumber(stats.remaining) or 0)),
                         sourceLabel = stats.sourceLabel or "Unknown Source",
@@ -109,93 +120,57 @@ end
 
 local function AllocateWithCaps(totalCopper, goals)
     totalCopper = math.max(0, math.floor(tonumber(totalCopper) or 0))
-    local result = {}
-    local active = {}
 
+    local result = {}
+    local totalPercent = 0
     for i, goal in ipairs(goals or {}) do
         result[i] = 0
-        if (tonumber(goal.weight) or 0) > 0 and (tonumber(goal.need) or 0) > 0 then
-            active[#active + 1] = i
-        end
+        totalPercent = totalPercent + math.max(0, tonumber(goal.weight) or 0)
     end
 
-    local remaining = totalCopper
-    local guard = 0
-    while remaining > 0 and #active > 0 and guard < 100 do
-        guard = guard + 1
-        local totalWeight = 0
-        for _, index in ipairs(active) do
-            totalWeight = totalWeight + math.max(0, tonumber(goals[index].weight) or 0)
-        end
-        if totalWeight <= 0 then break end
+    -- Allocation % is literal while the total is 100% or less. If the user
+    -- deliberately configures more than 100% across active Projects, scale the
+    -- calculator suggestion back to 100% so it can never suggest more gold than
+    -- actually exists. Project source views still keep their entered values.
+    local scale = totalPercent > 100 and (100 / totalPercent) or 1
+    local used = 0
 
-        local proposals = {}
-        local used = 0
-        for _, index in ipairs(active) do
-            local goal = goals[index]
-            local needLeft = math.max(0, math.floor((tonumber(goal.need) or 0) - (result[index] or 0)))
-            local exact = remaining * (math.max(0, tonumber(goal.weight) or 0) / totalWeight)
-            local share = math.min(needLeft, math.floor(exact))
-            proposals[#proposals + 1] = {
-                index = index,
-                amount = share,
-                fraction = exact - math.floor(exact),
-            }
-            used = used + share
-        end
+    for i, goal in ipairs(goals or {}) do
+        local weight = math.max(0, tonumber(goal.weight) or 0)
+        local need = math.max(0, math.floor(tonumber(goal.need) or 0))
+        local effectivePercent = weight * scale
+        local share = math.floor(totalCopper * (effectivePercent / 100))
+        share = math.min(need, share)
 
-        -- Integer copper rounding can leave a few copper undistributed. Hand
-        -- those to the largest fractional remainders before recalculating.
-        local roundLeft = remaining - used
-        if roundLeft > 0 then
-            table.sort(proposals, function(a, b)
-                if a.fraction == b.fraction then return a.index < b.index end
-                return a.fraction > b.fraction
-            end)
-            for _, proposal in ipairs(proposals) do
-                if roundLeft <= 0 then break end
-                local needLeft = math.max(0, math.floor((tonumber(goals[proposal.index].need) or 0)
-                    - (result[proposal.index] or 0) - proposal.amount))
-                if needLeft > 0 then
-                    proposal.amount = proposal.amount + 1
-                    used = used + 1
-                    roundLeft = roundLeft - 1
-                end
-            end
-        end
-
-        if used <= 0 then break end
-
-        for _, proposal in ipairs(proposals) do
-            result[proposal.index] = (result[proposal.index] or 0) + proposal.amount
-        end
-        remaining = math.max(0, remaining - used)
-
-        local nextActive = {}
-        for _, index in ipairs(active) do
-            if (result[index] or 0) < math.max(0, tonumber(goals[index].need) or 0) then
-                nextActive[#nextActive + 1] = index
-            end
-        end
-        active = nextActive
+        result[i] = share
+        used = used + share
     end
 
-    return result, remaining
+    return result, math.max(0, totalCopper - used)
 end
 
 function IRS:SetProfitDistributionWeight(goalId, value)
-    local state = EnsureToolsDB()
+    EnsureToolsDB()
+
     goalId = tostring(goalId or "")
-    if goalId == "" then return false end
+    local projectId = goalId:match("^project:(.+)$")
+    if not projectId or not IRS.SetProjectAllocationPercent then return false end
 
     value = tonumber(value)
     if not value then return false end
     value = math.max(0, math.min(100, value))
-    -- Keep one decimal place so users can use values like 12.5% without
-    -- accumulating floating-point noise in SavedVariables.
     value = math.floor((value * 10) + 0.5) / 10
-    state.weights[goalId] = value
-    return true
+
+    local ok = IRS:SetProjectAllocationPercent(
+        tonumber(projectId) or projectId,
+        value
+    )
+
+    if ok and IRS.RefreshMiniDashboard then
+        IRS:RefreshMiniDashboard()
+    end
+
+    return ok == true
 end
 
 function IRS:GetProfitDistribution()
@@ -222,7 +197,9 @@ function IRS:GetProfitDistribution()
             name = goal.name,
             weight = goal.weight,
             defaultWeight = goal.defaultWeight,
-            normalizedPercent = totalWeight > 0 and ((goal.weight / totalWeight) * 100) or 0,
+            normalizedPercent = totalWeight > 100
+                and ((goal.weight / totalWeight) * 100)
+                or math.max(0, tonumber(goal.weight) or 0),
             need = goal.need,
             suggested = amount,
             needAfter = math.max(0, goal.need - amount),
@@ -401,11 +378,11 @@ local MANUAL_SECTIONS = {
     },
     {
         "MINI DASHBOARD",
-        "The Mini Dashboard is a draggable at-a-glance panel. Its net-gold section can show the active character's daily net plus account-wide Today, This Week, This Month, and Total Recorded values; each statistic can be shown or hidden in Settings. It also shows selected Savings Projects, selected Reserve Funds, and the combined Daily Gold Target. The Daily Gold Target compares the selected Projects' combined daily requirement against today's account-wide net income, so earnings count regardless of where the gold is currently stored. When WoW Token Screen alerts are enabled, an active Good/Extreme Buy or Sell zone appears as a persistent banner under the Mini Dashboard header; if the Mini Dashboard is closed when the market enters an alert zone, IRS shows a temporary splash notification instead. Savings Projects and Reserve Funds can be collapsed independently. Right-click the minimap button or use /irs mini to toggle it. Its position, size, collapse states, and per-character open state are saved, and Settings can optionally auto-open it on login."
+        "The Mini Dashboard is a draggable at-a-glance panel. Its net-gold section can show the active character's daily net plus account-wide Today, This Week, This Month, and Total Recorded values; each statistic can be shown or hidden in Settings. It also shows selected Savings Projects, selected Reserve Funds, and the combined Daily Gold Target. The Daily Gold Target compares the selected Projects' combined daily requirement against the sum of those Projects' actual allocated source changes today, so the total uses the same savings progress shown by the individual rows. When WoW Token Screen alerts are enabled, an active Good/Extreme Buy or Sell zone appears as a persistent banner under the Mini Dashboard header; if the Mini Dashboard is closed when the market enters an alert zone, IRS shows a temporary splash notification instead. Savings Projects and Reserve Funds can be collapsed independently. Right-click the minimap button or use /irs mini to toggle it. Its position, size, collapse states, and per-character open state are saved, and Settings can optionally auto-open it on login."
     },
     {
         "SAVINGS PROJECTS",
-        "Projects answer: 'Can I reach X gold by Y date?' Set a name, target, Start Date, Deadline, source, and Allocation %. Current Allocated is the selected source balance multiplied by Allocation %. Daily Needed is based on remaining gold and remaining days. Project history is read from IRS's central source history, so editing a Project no longer deletes financial observations. Source/allocation changes are dated configuration changes rather than rewritten history."
+        "Projects answer: 'Can I reach X gold by Y date?' Set a name, target, Start Date, Deadline, source, and Allocation %. Current Allocated is the selected source balance multiplied by Allocation %. The same Allocation % is also used by Profit Distribution, so changing it in either place changes the active Project split everywhere. Daily Needed is based on remaining gold and remaining days. Project history is read from IRS's central source history, so editing a Project no longer deletes financial observations. Source/allocation changes are dated configuration changes rather than rewritten history."
     },
     {
         "PROJECT HISTORY & CHECKPOINTS",
@@ -417,7 +394,7 @@ local MANUAL_SECTIONS = {
     },
     {
         "PROFIT DISTRIBUTION CALCULATOR",
-        "The calculator uses IRS net profit accumulated since the last manual allocation checkpoint and distributes it across active Savings Projects only. Each Project has an editable Distribution % used only by this calculator; new Projects initially inherit their Project Allocation %, but changing the calculator value does not rewrite the Project. IRS normalizes those Distribution % values across the eligible Savings Projects, then suggests how much of the available profit goes to each. Suggestions are capped at each Project's remaining need; excess stays Unallocated. Reserve Funds are intentionally excluded because they maintain standing balances rather than competing for project savings. After physically moving the suggested gold, press MARK ALLOCATED. IRS records the current Total Recorded value as the new checkpoint and immediately begins accumulating only later net profit. Internal transfers do not change the profit pool."
+        "The calculator uses IRS net profit accumulated since the last manual allocation checkpoint and distributes it across active Savings Projects only. Distribution % is the Project's actual Allocation %, not a separate calculator-only value, so changing it here also changes the Project's current savings allocation. Totals below 100% intentionally leave the unused percentage Unallocated. If active Project percentages exceed 100%, calculator suggestions are proportionally scaled back to 100% so IRS never suggests moving more gold than is available. Suggestions are capped at each Project's remaining need; excess stays Unallocated. Reserve Funds are intentionally excluded because they maintain standing balances rather than competing for project savings. After physically moving the suggested gold, press MARK ALLOCATED. IRS records the current Total Recorded value as the new checkpoint and immediately begins accumulating only later net profit. Internal transfers do not change the profit pool."
     },
     {
         "CHARACTERS",
@@ -583,7 +560,7 @@ local function EnsureDistRow(index)
                 .. (self.data.sourceLabel or "Unknown Source"),
             0.68, 0.62, 0.51
         )
-        GameTooltip:AddLine(string.format("Distribution weight: %.1f%%", self.data.weight or 0), 0.88, 0.84, 0.75)
+        GameTooltip:AddLine(string.format("Project allocation: %.1f%%", self.data.weight or 0), 0.88, 0.84, 0.75)
         GameTooltip:AddLine("Suggested: " .. WholeGold(self.data.suggested or 0), 0.86, 0.71, 0.36)
         GameTooltip:Show()
     end)
@@ -781,9 +758,25 @@ function IRS:RefreshToolsPage()
         "Suggested total: %s    •    Unallocated remainder: %s",
         WholeGold(data.distributed), WholeGold(data.remainder)
     ))
+    local percentageNote
+    if (tonumber(data.totalWeight) or 0) < 100 then
+        percentageNote = string.format(
+            "Project Allocation %% totals %.1f%%; the remaining %.1f%% stays unallocated.",
+            data.totalWeight or 0,
+            math.max(0, 100 - (tonumber(data.totalWeight) or 0))
+        )
+    elseif (tonumber(data.totalWeight) or 0) > 100 then
+        percentageNote = string.format(
+            "Project Allocation %% totals %.1f%%; calculator suggestions are proportionally scaled to 100%%.",
+            data.totalWeight or 0
+        )
+    else
+        percentageNote = "Project Allocation % totals 100%."
+    end
+
     footerHint:SetText(string.format(
-        "Distribution weights total %.1f%% and are normalized across eligible Savings Projects. %d completed Project%s excluded; %d unavailable source%s excluded. A negative net since the checkpoint produces 0g available until the loss is recovered or a new allocation checkpoint is recorded.",
-        data.totalWeight or 0,
+        "%s %d completed Project%s excluded; %d unavailable source%s excluded. A negative net since the checkpoint produces 0g available until the loss is recovered or a new allocation checkpoint is recorded.",
+        percentageNote,
         data.completedExcluded or 0, (data.completedExcluded or 0) == 1 and "" or "s",
         data.unavailableExcluded or 0, (data.unavailableExcluded or 0) == 1 and "" or "s"
     ))
