@@ -135,3 +135,33 @@ A temporary watchdog also reports a startup stage if execution is aborted before
 Use `/irs timing` (or `/irs startup`) after login to print the captured startup timing report.
 
 No suspected function has been optimized or behaviorally changed. The current goal is evidence collection only.
+
+## Fixed
+
+### Profit Distributor C Stack Overflow When Marking Allocation
+
+**Status:** Fixed  
+**Observed:** October 7, 2026  
+**Trigger:** Tools → Profit Distribution → mark the current allocation checkpoint as allocated
+
+The error reported:
+
+`Interface/AddOns/IncomeRecordsSystem/Core/Core.lua:2361: C stack overflow`
+
+The repeating stack path showed `Features/Tools.lua` repeatedly entering the checkpoint appearance refresh through `Disable()`. `Core.lua:GetSortedProjects()` was where the stack finally overflowed, but it was not the source of the recursion.
+
+### Cause
+
+After an allocation checkpoint was marked, available profit became 0 and `RefreshToolsPage()` refreshed the checkpoint button. `RefreshCheckpointAppearance()` called `checkpoint:Disable()` while the button was still being interacted with. Disabling the hovered button fired its `OnLeave` handler, which called `RefreshCheckpointAppearance()` again and attempted another `Disable()`, recursively repeating until the C stack overflowed.
+
+### Fix
+
+The checkpoint appearance refresh now:
+
+- uses a local re-entry guard so nested `OnEnter`/`OnLeave` appearance refreshes are ignored while the current refresh is still running;
+- calls `Enable()` only when the button is currently disabled;
+- calls `Disable()` only when the button is currently enabled;
+- preserves the existing enabled, disabled, hover, and allocation behavior.
+
+No changes were made to `GetSortedProjects()` or the Profit Distributor allocation calculations.
+

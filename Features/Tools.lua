@@ -671,13 +671,22 @@ local function LayoutDistributionColumns()
 end
 
 local checkpointHover = false
+local checkpointAppearanceRefreshing = false
 
 local function RefreshCheckpointAppearance()
+    -- Enabling or disabling a hovered button can fire OnEnter/OnLeave while this
+    -- function is still running. Ignore that nested appearance refresh and only
+    -- change the enabled state when it actually needs to change.
+    if checkpointAppearanceRefreshing then return end
+    checkpointAppearanceRefreshing = true
+
     local data = IRS:GetProfitDistribution()
     local enabled = (tonumber(data.availableProfit) or 0) > 0
 
     if enabled then
-        checkpoint:Enable()
+        if not checkpoint:IsEnabled() then
+            checkpoint:Enable()
+        end
         if checkpointHover then
             checkpoint:SetBackdropColor(0.285, 0.215, 0.135, 0.98)
             checkpoint:SetBackdropBorderColor(unpack(COLORS.gold))
@@ -688,11 +697,15 @@ local function RefreshCheckpointAppearance()
             SetColor(checkpoint.label, COLORS.text)
         end
     else
-        checkpoint:Disable()
+        if checkpoint:IsEnabled() then
+            checkpoint:Disable()
+        end
         checkpoint:SetBackdropColor(COLORS.panel[1], COLORS.panel[2], COLORS.panel[3], 0.55)
         checkpoint:SetBackdropBorderColor(COLORS.borderSoft[1], COLORS.borderSoft[2], COLORS.borderSoft[3], 0.55)
         SetColor(checkpoint.label, COLORS.muted)
     end
+
+    checkpointAppearanceRefreshing = false
 end
 
 checkpoint:SetScript("OnEnter", function()
