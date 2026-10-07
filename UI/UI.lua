@@ -775,8 +775,6 @@ local progressText = MakeText(projectSummary, 8, COLORS.text, "CENTER"); progres
 -- Daily tracker and graph
 local dailyPanel = MakePanel(projectsPage, COLORS.bg)
 dailyPanel:SetBackdropBorderColor(0, 0, 0, 0)
-dailyPanel:SetPoint("TOPLEFT", 4, -370)
-dailyPanel:SetSize(410, 450)
 local dailyTitle = MakeText(dailyPanel, 13, COLORS.goldSoft, "LEFT"); dailyTitle:SetPoint("TOPLEFT", 12, -10); dailyTitle:SetText("DAILY GOLD TRACKER")
 local dailySub = MakeText(dailyPanel, 8, COLORS.muted, "LEFT"); dailySub:SetPoint("TOPLEFT", dailyTitle, "BOTTOMLEFT", 0, -3); dailySub:SetText("Shared IRS source history within this project window")
 local dailyHeader = CreateFrame("Frame", nil, dailyPanel)
@@ -800,12 +798,61 @@ local function EnsureDailyRow(index)
     local line=row:CreateTexture(nil,"BORDER"); line:SetTexture("Interface/Buttons/WHITE8X8"); line:SetVertexColor(0.11,0.12,0.12,1); line:SetHeight(1); line:SetPoint("BOTTOMLEFT",0,0); line:SetPoint("BOTTOMRIGHT",0,0)
     dailyPanel.rows[index]=row; return row
 end
+local function LayoutDailyTrackerColumns()
+    local contentWidth = math.max(370, dailyHeader:GetWidth() or 370)
+    local dateWidth = math.max(105, math.floor(contentWidth * 0.22))
+    local valueWidth = math.max(
+        85,
+        math.floor((contentWidth - dateWidth) / 3)
+    )
+
+    dh1:ClearAllPoints()
+    dh1:SetPoint("LEFT", 2, 0)
+    dh1:SetWidth(dateWidth - 4)
+
+    dh2:ClearAllPoints()
+    dh2:SetPoint("LEFT", dateWidth, 0)
+    dh2:SetWidth(valueWidth - 8)
+
+    dh3:ClearAllPoints()
+    dh3:SetPoint("LEFT", dateWidth + valueWidth, 0)
+    dh3:SetWidth(valueWidth - 8)
+
+    dh4:ClearAllPoints()
+    dh4:SetPoint("LEFT", dateWidth + (valueWidth * 2), 0)
+    dh4:SetWidth(valueWidth - 8)
+
+    for _, row in ipairs(dailyPanel.rows) do
+        row.date:ClearAllPoints()
+        row.date:SetPoint("LEFT", 2, 0)
+        row.date:SetWidth(dateWidth - 4)
+
+        row.start:ClearAllPoints()
+        row.start:SetPoint("LEFT", dateWidth, 0)
+        row.start:SetWidth(valueWidth - 8)
+
+        row.ending:ClearAllPoints()
+        row.ending:SetPoint("LEFT", dateWidth + valueWidth, 0)
+        row.ending:SetWidth(valueWidth - 8)
+
+        row.change:ClearAllPoints()
+        row.change:SetPoint(
+            "LEFT",
+            dateWidth + (valueWidth * 2),
+            0
+        )
+        row.change:SetWidth(valueWidth - 8)
+    end
+end
 
 local graphPanel = MakePanel(projectsPage, COLORS.bg)
 graphPanel:SetBackdropBorderColor(0, 0, 0, 0)
-graphPanel:SetPoint("TOPLEFT", 424, -370)
+graphPanel:SetPoint("TOPLEFT", 4, -370)
 graphPanel:SetPoint("TOPRIGHT", -4, -370)
 graphPanel:SetHeight(450)
+dailyPanel:SetPoint("TOPLEFT", graphPanel, "BOTTOMLEFT", 0, -12)
+dailyPanel:SetPoint("TOPRIGHT", graphPanel, "BOTTOMRIGHT", 0, -12)
+dailyPanel:SetHeight(450)
 local graphTitle = MakeText(graphPanel, 13, COLORS.goldSoft, "LEFT"); graphTitle:SetPoint("TOPLEFT", 12, -10); graphTitle:SetText("PROJECT TRAJECTORY")
 local graphLegend = MakeText(graphPanel, 8, COLORS.muted, "RIGHT"); graphLegend:SetPoint("TOPRIGHT", -12, -13); graphLegend:SetText("|cffc9a64dRequired|r   |cff669fa6Actual|r")
 
@@ -1129,6 +1176,7 @@ function IRS:RefreshProjectsPage(preserveForm)
         dailySub:SetText("No source history recorded in this project window yet")
     end
     local rowWidth=math.max(370,dailyScroll:GetWidth()-4)
+        dailyChild:SetWidth(rowWidth)
     local dailyRowHeight=math.max(27, IRS:GetFontSize("main","body") + 12)
     for i,data in ipairs(rows) do
         local row=EnsureDailyRow(i); row:SetHeight(dailyRowHeight); row:ClearAllPoints(); row:SetPoint("TOPLEFT",0,-((i-1)*(dailyRowHeight+1))); row:SetWidth(rowWidth)
@@ -1136,6 +1184,7 @@ function IRS:RefreshProjectsPage(preserveForm)
     end
     for i=#rows+1,#dailyPanel.rows do dailyPanel.rows[i]:Hide() end
     dailyChild:SetHeight(math.max(1,#rows*(dailyRowHeight+1)))
+        LayoutDailyTrackerColumns()
 
     local graphInterval = IRS:GetProjectGraphInterval(project)
     for intervalKey, button in pairs(graphPanel.intervalButtons) do
@@ -2097,15 +2146,19 @@ function IRS:RefreshMainWindowSizeLayout()
         card:SetWidth(summaryCardWidth)
     end
 
-    -- The Daily Tracker keeps its readable table width; the trajectory graph
-    -- receives additional horizontal space as the window grows.
+    -- Project Trajectory and Daily Gold Tracker stack vertically and use the
+    -- full available Projects page width.
     dailyPanel:ClearAllPoints()
     dailyPanel:SetPoint("TOPLEFT", projectSummary, "BOTTOMLEFT", 0, -12)
     dailyPanel:SetWidth(410)
 
     graphPanel:ClearAllPoints()
-    graphPanel:SetPoint("TOPLEFT", projectSummary, "BOTTOMLEFT", 420, -12)
-    graphPanel:SetPoint("TOPRIGHT", projectsPage, "TOPRIGHT", -4, 0)
+    graphPanel:SetPoint("TOPLEFT", projectSummary, "BOTTOMLEFT", 0, -12)
+    graphPanel:SetPoint("TOPRIGHT", projectSummary, "BOTTOMRIGHT", 0, -12)
+    dailyPanel:ClearAllPoints()
+    dailyPanel:SetPoint("TOPLEFT", graphPanel, "BOTTOMLEFT", 0, -12)
+    dailyPanel:SetPoint("TOPRIGHT", graphPanel, "BOTTOMRIGHT", 0, -12)
+    LayoutDailyTrackerColumns()
 
     -- Reports metric cards fill their three-column grid.
     local reportWidth = math.max(1, reportPanel:GetWidth() or 1)
@@ -2271,15 +2324,14 @@ function IRS:RefreshMainFontLayout()
         340 + (helper * 2)
     )
 
-    dailyPanel:ClearAllPoints()
-    dailyPanel:SetPoint("TOPLEFT", projectSummary, "BOTTOMLEFT", 0, -12)
-    dailyPanel:SetWidth(410)
-    dailyPanel:SetHeight(lowerPanelHeight)
-
     graphPanel:ClearAllPoints()
-    graphPanel:SetPoint("TOPLEFT", projectSummary, "BOTTOMLEFT", 420, -12)
-    graphPanel:SetPoint("TOPRIGHT", projectsPage, "TOPRIGHT", -4, 0)
+    graphPanel:SetPoint("TOPLEFT", projectSummary, "BOTTOMLEFT", 0, -12)
+    graphPanel:SetPoint("TOPRIGHT", projectsPage, "TOPRIGHT", 0, -12)
     graphPanel:SetHeight(lowerPanelHeight)
+    dailyPanel:ClearAllPoints()
+    dailyPanel:SetPoint("TOPLEFT", graphPanel, "BOTTOMLEFT", 0, -12)
+    dailyPanel:SetPoint("TOPRIGHT", graphPanel, "BOTTOMRIGHT", 0, -12)
+    dailyPanel:SetHeight(lowerPanelHeight)
 
     dailyHeader:ClearAllPoints()
     dailyHeader:SetPoint("TOPLEFT", dailySub, "BOTTOMLEFT", -2, -10)
@@ -2289,6 +2341,7 @@ function IRS:RefreshMainFontLayout()
     dailyScroll:ClearAllPoints()
     dailyScroll:SetPoint("TOPLEFT", dailyHeader, "BOTTOMLEFT", 0, -3)
     dailyScroll:SetPoint("BOTTOMRIGHT", -25, 10)
+    LayoutDailyTrackerColumns()
 
     graph:ClearAllPoints()
     graph:SetPoint("TOPLEFT", 50, -(math.max(sectionSize, helper) + 54))
