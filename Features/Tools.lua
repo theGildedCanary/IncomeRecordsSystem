@@ -418,7 +418,7 @@ local MANUAL_SECTIONS = {
     },
     {
         "MINI DASHBOARD",
-        "The Mini Dashboard is a draggable at-a-glance panel. It shows account net totals, selected Savings Projects, selected Reserve Funds, and the combined Daily Gold Target. Savings Projects and Reserve Funds can be collapsed independently. Right-click the minimap button or use /irs mini to toggle it. Its position, size, and collapse states are saved."
+        "The Mini Dashboard is a draggable at-a-glance panel. Its net-gold section can show the active character's daily net plus account-wide Today, This Week, This Month, and Total Recorded values; each statistic can be shown or hidden in Settings. It also shows selected Savings Projects, selected Reserve Funds, and the combined Daily Gold Target. The Daily Gold Target compares the selected Projects' combined daily requirement against today's account-wide net income, so earnings count regardless of where the gold is currently stored. Savings Projects and Reserve Funds can be collapsed independently. Right-click the minimap button or use /irs mini to toggle it. Its position, size, collapse states, and per-character open state are saved, and Settings can optionally auto-open it on login."
     },
     {
         "SAVINGS PROJECTS",
