@@ -532,7 +532,17 @@ projectsTitle:SetText("SAVINGS PROJECTS")
 local projectsDesc = MakeText(projectsPage, 10, COLORS.text, "LEFT")
 projectsDesc:SetPoint("TOPLEFT", projectsTitle, "BOTTOMLEFT", 0, -7)
 projectsDesc:SetPoint("RIGHT", -4, 0)
-projectsDesc:SetText("Create long-term savings goals and track a percentage of account, Warband, guild, or character-held gold against a deadline.")
+projectsDesc:SetText("Create and manage long-term savings goals. Distribution and reserve planning live in the Allocation tab.")
+
+local projectManagementView = CreateFrame("Frame", nil, projectsPage)
+projectManagementView:SetAllPoints(projectsPage)
+IRS.projectManagementView = projectManagementView
+
+local projectAllocationView = CreateFrame("Frame", nil, projectsPage)
+projectAllocationView:SetPoint("TOPLEFT", projectsPage, "TOPLEFT", 4, -58)
+projectAllocationView:SetPoint("BOTTOMRIGHT", projectsPage, "BOTTOMRIGHT", -4, 4)
+projectAllocationView:Hide()
+IRS.projectAllocationView = projectAllocationView
 
 -- Consistent button factory used inside the Projects page.
 local function MakeProjectButton(parent, text, x, y, w, onClick)
@@ -548,6 +558,44 @@ local function MakeProjectButton(parent, text, x, y, w, onClick)
     if onClick then b:SetScript("OnClick", onClick) end
     return b
 end
+
+local projectManagementTab = MakeProjectButton(projectsPage, "PROJECT MANAGEMENT", 0, 0, 170)
+projectManagementTab:ClearAllPoints()
+projectManagementTab:SetPoint("TOPRIGHT", projectsPage, "TOPRIGHT", -126, -2)
+
+local projectAllocationTab = MakeProjectButton(projectsPage, "ALLOCATION", 0, 0, 116)
+projectAllocationTab:ClearAllPoints()
+projectAllocationTab:SetPoint("TOPRIGHT", projectsPage, "TOPRIGHT", -4, -2)
+
+function IRS:SetProjectsSection(section)
+    if not IRS.db then IRS:EnsureDB() end
+    IRS.db.ui = IRS.db.ui or {}
+    section = section == "allocation" and "allocation" or "management"
+    IRS.db.ui.projectsSection = section
+
+    local allocationActive = section == "allocation"
+    projectManagementView:SetShown(not allocationActive)
+    projectAllocationView:SetShown(allocationActive)
+
+    projectManagementTab:SetBackdropColor(unpack(allocationActive and COLORS.panel or COLORS.panelAlt))
+    projectManagementTab:SetBackdropBorderColor(unpack(allocationActive and COLORS.border or COLORS.goldSoft))
+    SetColor(projectManagementTab.label, allocationActive and COLORS.text or COLORS.gold)
+
+    projectAllocationTab:SetBackdropColor(unpack(allocationActive and COLORS.panelAlt or COLORS.panel))
+    projectAllocationTab:SetBackdropBorderColor(unpack(allocationActive and COLORS.goldSoft or COLORS.border))
+    SetColor(projectAllocationTab.label, allocationActive and COLORS.gold or COLORS.text)
+
+    if allocationActive then
+        projectsDesc:SetText("Set linked Project Distribution percentages, reserve a share of total profit, and review each calculated Split %.")
+        if IRS.RefreshProjectAllocationPage then IRS:RefreshProjectAllocationPage() end
+    else
+        projectsDesc:SetText("Create and manage long-term savings goals. Distribution and reserve planning live in the Allocation tab.")
+        if IRS.RefreshProjectsPage then IRS:RefreshProjectsPage(true) end
+    end
+end
+
+projectManagementTab:SetScript("OnClick", function() IRS:SetProjectsSection("management") end)
+projectAllocationTab:SetScript("OnClick", function() IRS:SetProjectsSection("allocation") end)
 
 -- Creates a labeled edit box used by the project name/target/deadline form.
 local function MakeProjectEdit(parent, labelText, x, y, w)
@@ -581,27 +629,27 @@ local function GoldInputText(copper)
     return tostring(gold)
 end
 
-local projectSelectLabel = MakeText(projectsPage, 9, COLORS.muted, "LEFT")
+local projectSelectLabel = MakeText(projectManagementView, 9, COLORS.muted, "LEFT")
 projectSelectLabel:SetPoint("TOPLEFT", 4, -58)
 projectSelectLabel:SetText("PROJECT")
 
-local projectSelect = MakeProjectButton(projectsPage, "Select project", 4, -75, 280)
+local projectSelect = MakeProjectButton(projectManagementView, "Select project", 4, -75, 280)
 projectSelect.label:SetJustifyH("LEFT")
 projectSelect.label:ClearAllPoints(); projectSelect.label:SetPoint("LEFT", 10, 0); projectSelect.label:SetPoint("RIGHT", -24, 0)
 local projectSelectArrow = MakeText(projectSelect, 10, COLORS.gold, "RIGHT")
 projectSelectArrow:SetPoint("RIGHT", -8, 0); projectSelectArrow:SetText("v")
 
-local newProjectButton = MakeProjectButton(projectsPage, "NEW PROJECT", 294, -75, 112)
-local deleteProjectButton = MakeProjectButton(projectsPage, "DELETE", 416, -75, 100)
+local newProjectButton = MakeProjectButton(projectManagementView, "NEW PROJECT", 294, -75, 112)
+local deleteProjectButton = MakeProjectButton(projectManagementView, "DELETE", 416, -75, 100)
 
-IRS.projectCheckpointsButton = MakeProjectButton(projectsPage, "CHECKPOINTS", 528, -75, 122)
+IRS.projectCheckpointsButton = MakeProjectButton(projectManagementView, "CHECKPOINTS", 528, -75, 122)
 IRS.projectCheckpointsButton:SetScript("OnClick", function()
     if IRS.ShowProjectCheckpointsManager then
         IRS:ShowProjectCheckpointsManager()
     end
 end)
 
-local projectStatus = MakeText(projectsPage, 9, COLORS.muted, "LEFT")
+local projectStatus = MakeText(projectManagementView, 9, COLORS.muted, "LEFT")
 projectStatus:SetPoint("TOPLEFT", 662, -81)
 projectStatus:SetPoint("RIGHT", -4, 0)
 projectStatus:SetText("")
@@ -634,27 +682,26 @@ local function EnsureProjectPopupRow(index)
 end
 
 -- Editable project fields
-local projectNameBox = MakeProjectEdit(projectsPage, "PROJECT NAME", 4, -118, 205)
-local projectTargetBox = MakeProjectEdit(projectsPage, "TARGET GOLD", 219, -118, 130)
-local projectStartBox = MakeProjectEdit(projectsPage, "START DATE (YYYY-MM-DD)", 359, -118, 145)
-local projectDeadlineBox = MakeProjectEdit(projectsPage, "DEADLINE (YYYY-MM-DD)", 514, -118, 145)
-local projectAllocationBox = MakeProjectEdit(projectsPage, "ALLOCATION %", 669, -118, 88)
+local projectNameBox = MakeProjectEdit(projectManagementView, "PROJECT NAME", 4, -118, 205)
+local projectTargetBox = MakeProjectEdit(projectManagementView, "TARGET GOLD", 219, -118, 130)
+local projectStartBox = MakeProjectEdit(projectManagementView, "START DATE (YYYY-MM-DD)", 359, -118, 145)
+local projectDeadlineBox = MakeProjectEdit(projectManagementView, "DEADLINE (YYYY-MM-DD)", 514, -118, 220)
 
-local sourceLabel = MakeText(projectsPage, 9, COLORS.muted, "LEFT")
+local sourceLabel = MakeText(projectManagementView, 9, COLORS.muted, "LEFT")
 sourceLabel:SetPoint("TOPLEFT", 4, -174); sourceLabel:SetText("SOURCE")
-local sourceButton = MakeProjectButton(projectsPage, "Account Liquid Gold", 4, -191, 180)
+local sourceButton = MakeProjectButton(projectManagementView, "Account Liquid Gold", 4, -191, 180)
 sourceButton.label:SetJustifyH("LEFT"); sourceButton.label:ClearAllPoints(); sourceButton.label:SetPoint("LEFT", 8, 0); sourceButton.label:SetPoint("RIGHT", -20, 0)
 local sourceArrow = MakeText(sourceButton, 9, COLORS.gold, "RIGHT"); sourceArrow:SetPoint("RIGHT", -7, 0); sourceArrow:SetText("v")
 
-local sourceDetailLabel = MakeText(projectsPage, 9, COLORS.muted, "LEFT")
+local sourceDetailLabel = MakeText(projectManagementView, 9, COLORS.muted, "LEFT")
 sourceDetailLabel:SetPoint("TOPLEFT", 194, -174); sourceDetailLabel:SetText("SOURCE DETAIL")
-local sourceDetailButton = MakeProjectButton(projectsPage, "Not required", 194, -191, 270)
+local sourceDetailButton = MakeProjectButton(projectManagementView, "Not required", 194, -191, 270)
 sourceDetailButton.label:SetJustifyH("LEFT"); sourceDetailButton.label:ClearAllPoints(); sourceDetailButton.label:SetPoint("LEFT", 8, 0); sourceDetailButton.label:SetPoint("RIGHT", -20, 0)
 local sourceDetailArrow = MakeText(sourceDetailButton, 9, COLORS.gold, "RIGHT"); sourceDetailArrow:SetPoint("RIGHT", -7, 0); sourceDetailArrow:SetText("v")
 
-local saveProjectButton = MakeProjectButton(projectsPage, "SAVE PROJECT", 479, -191, 120)
-local syncGuildButton = MakeProjectButton(projectsPage, "SYNC GUILD BANK", 609, -191, 145)
-local formNote = MakeText(projectsPage, 8, COLORS.muted, "LEFT")
+local saveProjectButton = MakeProjectButton(projectManagementView, "SAVE PROJECT", 479, -191, 120)
+local syncGuildButton = MakeProjectButton(projectManagementView, "SYNC GUILD BANK", 609, -191, 145)
+local formNote = MakeText(projectManagementView, 8, COLORS.muted, "LEFT")
 formNote:SetPoint("TOPLEFT", 764, -191); formNote:SetPoint("RIGHT", -4, 0)
 formNote:SetText("History is stored by IRS and survives project edits.")
 
@@ -752,7 +799,7 @@ sourceDetailButton:SetScript("OnClick", function()
 end)
 
 -- Project summary
-local projectSummary = MakePanel(projectsPage, COLORS.bg)
+local projectSummary = MakePanel(projectManagementView, COLORS.bg)
 projectSummary:SetBackdropBorderColor(0, 0, 0, 0)
 projectSummary:SetPoint("TOPLEFT", 4, -232); projectSummary:SetPoint("TOPRIGHT", -4, -232); projectSummary:SetHeight(126)
 projectSummary.cards = {}
@@ -773,7 +820,7 @@ progressBar:SetTexture("Interface/Buttons/WHITE8X8"); progressBar:SetVertexColor
 local progressText = MakeText(projectSummary, 8, COLORS.text, "CENTER"); progressText:SetPoint("CENTER", progressBG, "CENTER", 0, 0)
 
 -- Daily tracker and graph
-local dailyPanel = MakePanel(projectsPage, COLORS.bg)
+local dailyPanel = MakePanel(projectManagementView, COLORS.bg)
 dailyPanel:SetBackdropBorderColor(0, 0, 0, 0)
 local dailyTitle = MakeText(dailyPanel, 13, COLORS.goldSoft, "LEFT"); dailyTitle:SetPoint("TOPLEFT", 12, -10); dailyTitle:SetText("DAILY GOLD TRACKER")
 local dailySub = MakeText(dailyPanel, 8, COLORS.muted, "LEFT"); dailySub:SetPoint("TOPLEFT", dailyTitle, "BOTTOMLEFT", 0, -3); dailySub:SetText("Shared IRS source history within this project window")
@@ -845,7 +892,7 @@ local function LayoutDailyTrackerColumns()
     end
 end
 
-local graphPanel = MakePanel(projectsPage, COLORS.bg)
+local graphPanel = MakePanel(projectManagementView, COLORS.bg)
 graphPanel:SetBackdropBorderColor(0, 0, 0, 0)
 graphPanel:SetPoint("TOPLEFT", 4, -370)
 graphPanel:SetPoint("TOPRIGHT", -4, -370)
@@ -969,7 +1016,6 @@ local function LoadProjectIntoForm(project)
         projectTargetBox:SetText("")
         projectStartBox:SetText(date("%Y-%m-%d"))
         projectDeadlineBox:SetText(date("%Y-%m-%d", time() + (30 * 86400)))
-        projectAllocationBox:SetText("100")
         projectSourceType, projectSourceKey = "account", nil
         sourceButton.label:SetText("Account Liquid Gold")
         sourceDetailButton.label:SetText("Not required")
@@ -984,7 +1030,6 @@ local function LoadProjectIntoForm(project)
     projectTargetBox:SetText(GoldInputText(project.targetCopper or 0))
     projectStartBox:SetText(project.startDate or project.createdDay or date("%Y-%m-%d"))
     projectDeadlineBox:SetText(project.deadline or "")
-    projectAllocationBox:SetText(tostring(project.allocationPercent or 100))
     projectSourceType, projectSourceKey = project.sourceType or "account", project.sourceKey
     sourceButton.label:SetText(SourceTypeLabel(projectSourceType))
     local _, _, detailLabel = IRS:GetProjectSourceBalance(project)
@@ -1026,6 +1071,7 @@ deleteProjectButton:SetScript("OnClick", function()
         return
     end
     IRS:DeleteProject(selectedProjectId)
+    if IRS.SyncProjectDistributionPlan then IRS:SyncProjectDistributionPlan() end
     selectedProjectId=nil; deleteArmedId=nil; deleteProjectButton.label:SetText("DELETE")
     local first=IRS:GetSortedProjects()[1]
     LoadProjectIntoForm(first and first.project or nil)
@@ -1035,7 +1081,6 @@ end)
 
 saveProjectButton:SetScript("OnClick", function()
     local target=ParseGoldInput(projectTargetBox:GetText())
-    local allocation=tonumber(projectAllocationBox:GetText())
     local data={
         name=projectNameBox:GetText(),
         targetCopper=target,
@@ -1043,7 +1088,6 @@ saveProjectButton:SetScript("OnClick", function()
         deadline=strtrim(projectDeadlineBox:GetText() or ""),
         sourceType=projectSourceType,
         sourceKey=projectSourceKey,
-        allocationPercent=allocation,
     }
     if (projectSourceType=="character" or projectSourceType=="guild") and not projectSourceKey then
         projectStatus:SetText("Choose a character or guild bank for this source."); return
@@ -1055,7 +1099,9 @@ saveProjectButton:SetScript("OnClick", function()
     else
         local id, result=IRS:CreateProject(data)
         if not id then projectStatus:SetText(result or "Could not create project."); return end
-        selectedProjectId=id; projectStatus:SetText("Project created."); LoadProjectIntoForm(result)
+        selectedProjectId=id
+        if IRS.SyncProjectDistributionPlan then IRS:SyncProjectDistributionPlan() end
+        projectStatus:SetText("Project created."); LoadProjectIntoForm(result)
     end
     IRS:RefreshProjectsPage()
 end)
@@ -1162,7 +1208,7 @@ function IRS:RefreshProjectsPage(preserveForm)
     local summaryWidth = projectSummary:GetWidth()
     if not summaryWidth or summaryWidth < 100 then summaryWidth = 850 end
     local barWidth=math.max(1, math.floor((summaryWidth-28)*(stats.percent or 0))); progressBar:SetWidth(barWidth)
-    progressText:SetText(string.format("%.1f%% funded • %d days left • %d%% of %s",(stats.percent or 0)*100, stats.daysLeft or 0, project.allocationPercent or 100, stats.sourceLabel or "source"))
+    progressText:SetText(string.format("%.1f%% funded • %d days left • %s",(stats.percent or 0)*100, stats.daysLeft or 0, stats.sourceLabel or "source"))
 
     local rows=IRS:GetProjectDailyHistory(project,true)
     if #rows > 0 then
@@ -1379,6 +1425,11 @@ function IRS:RefreshProjectsPage(preserveForm)
     end
 end
 
+
+if not IRS.db then IRS:EnsureDB() end
+IRS.db.ui = IRS.db.ui or {}
+IRS:SetProjectsSection(IRS.db.ui.projectsSection or "management")
+
 -- ============================================================================
 -- RESERVE FUNDS PAGE SHELL
 -- The full interface and reserve accounting model live in
@@ -1392,8 +1443,8 @@ IRS.pageFrames.reserves = IRS.reservesPage
 
 -- ============================================================================
 -- TOOLS PAGE SHELL
--- The User's Manual and Profit Distribution Calculator live in
--- Features\IncomeRecordsSystem_Tools.lua to keep this already-large UI chunk lean.
+-- The User's Manual lives in Features\Tools.lua. The same module also builds
+-- the Profit Distribution interface inside Savings Projects > Allocation.
 -- ============================================================================
 IRS.toolsPage = CreateFrame("Frame", nil, content)
 IRS.toolsPage:SetAllPoints()

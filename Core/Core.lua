@@ -2680,9 +2680,9 @@ function IRS:GetProject(projectId)
     return IRS.db.projects.items[projectId] or IRS.db.projects.items[tostring(projectId)]
 end
 
--- Saves one Project Allocation % change without rewriting earlier source
--- history. Profit Distribution uses this same value so Projects and the
--- distributor cannot silently disagree about the active savings split.
+-- Saves one Project's effective Split % without rewriting earlier source
+-- history. The Allocation tab calculates this from the linked Distribution %
+-- sliders after the manual Reserve % has been removed from the total.
 function IRS:SetProjectAllocationPercent(projectId, value)
     if not IRS.db then IRS:EnsureDB() end
 
@@ -2773,7 +2773,7 @@ function IRS:CreateProject(data)
     data = data or {}
 
     local target = math.floor(tonumber(data.targetCopper) or 0)
-    local allocation = tonumber(data.allocationPercent) or 100
+    local allocation = tonumber(data.allocationPercent) or 0
     local startDate = tostring(data.startDate or CurrentDateKey())
     local deadline = tostring(data.deadline or "")
     local validStart = IRS:ValidateProjectDeadline(startDate)
@@ -2785,8 +2785,8 @@ function IRS:CreateProject(data)
     if (DaysBetweenDateKeys(startDate, deadline) or -1) < 0 then
         return nil, "Deadline cannot be before the Start Date."
     end
-    if allocation <= 0 or allocation > 100 then
-        return nil, "Allocation must be between 1 and 100%."
+    if allocation < 0 or allocation > 100 then
+        return nil, "Allocation must be between 0 and 100%."
     end
 
     local id = IRS.db.projects.nextId
@@ -2837,7 +2837,9 @@ function IRS:UpdateProject(projectId, data)
     EnsureProjectConfigHistory(project)
 
     local target = math.floor(tonumber(data.targetCopper) or project.targetCopper or 0)
-    local allocation = tonumber(data.allocationPercent) or project.allocationPercent or 100
+    -- Project Management no longer edits allocation directly. This value is
+    -- maintained by the Allocation tab as the project's calculated Split %.
+    local allocation = math.max(0, math.min(100, tonumber(project.allocationPercent) or 0))
     local startDate = tostring(data.startDate or project.startDate or project.createdDay or CurrentDateKey())
     local deadline = tostring(data.deadline or project.deadline or "")
     local validStart = IRS:ValidateProjectDeadline(startDate)
@@ -2849,8 +2851,8 @@ function IRS:UpdateProject(projectId, data)
     if (DaysBetweenDateKeys(startDate, deadline) or -1) < 0 then
         return false, "Deadline cannot be before the Start Date."
     end
-    if allocation <= 0 or allocation > 100 then
-        return false, "Allocation must be between 1 and 100%."
+    if allocation < 0 or allocation > 100 then
+        return false, "Allocation must be between 0 and 100%."
     end
 
     local oldSourceType = project.sourceType or "account"

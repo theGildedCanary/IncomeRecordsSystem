@@ -13,15 +13,16 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 
 ### Changed
 
-- Profit Distribution now allocates net profit across active Savings Projects only; Reserve Funds no longer dilute Project distribution percentages.
-- Profit Distribution and Savings Projects now share one authoritative Allocation % per Project instead of maintaining separate calculator weights.
-- Distribution totals below 100% now intentionally leave the unused share unallocated; totals above 100% are scaled only for the calculator suggestion so IRS never recommends moving more gold than is available.
+- Savings Projects now use separate Project Management and Allocation tabs.
+- Profit Distribution moved from Tools into Savings Projects > Allocation.
+- Each Savings Project now has its own linked Distribution % slider; changing one slider automatically redistributes the remaining percentage across the other Projects so Project Distribution always totals 100%.
+- Added a manual Reserve % carve-out. Reserve % is removed from total profit first, and each Project's read-only Split % shows its effective share of the total after reserves.
+- Project Management no longer exposes a per-project Allocation % field; the calculated Split % is used internally for shared-source Project accounting.
 
 ### Fixed
 
-- Fixed Savings Project distribution percentages being normalized together with Reserve Fund percentages, which could make shared Guild Bank Project splits appear not to tally correctly.
-- Fixed the Mini Dashboard Daily Gold Target comparing Project requirements against account-wide net income instead of the selected Projects' actual allocated source changes.
-- Existing saved Profit Distribution percentages are migrated into their matching Projects so current splits are preserved when upgrading.
+- Existing Profit Distribution percentages are migrated into the new linked Project Distribution plan so current project priorities are preserved when upgrading.
+- Shared-source Project accounting now follows the calculated Split % rather than conflating Project Distribution with the post-Reserve effective allocation.
 
 ### Removed
 

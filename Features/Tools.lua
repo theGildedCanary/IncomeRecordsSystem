@@ -1,6 +1,6 @@
 --[[
 IRS — Tools
-In-addon manual and Profit Distribution Calculator.
+In-addon manual plus Savings Projects Allocation / Profit Distribution.
 ]]
 
 local IRS = IRS
@@ -30,6 +30,117 @@ local function TodayKey()
     return date("%Y-%m-%d", Now())
 end
 
+local function RoundPercent(value)
+    value = math.max(0, math.min(100, tonumber(value) or 0))
+    return math.floor((value * 10) + 0.5) / 10
+end
+
+local function GetAllocationProjects()
+    local rows = {}
+    if not IRS.GetSortedProjects then return rows end
+    for _, entry in ipairs(IRS:GetSortedProjects()) do
+        local project = entry.project
+        if project and not project.convertedToReserveId then
+            rows[#rows + 1] = {id=tostring(entry.id), objectId=entry.id, project=project}
+        end
+    end
+    return rows
+end
+
+local function NormalizeValues(rawValues, entries, targetTotal)
+    local result = {}
+    targetTotal = RoundPercent(targetTotal)
+    if #entries == 0 then return result end
+
+    local rawTotal = 0
+    for _, entry in ipairs(entries) do
+        rawTotal = rawTotal + math.max(0, tonumber(rawValues[entry.id]) or 0)
+    end
+    if rawTotal <= 0 then
+        for _, entry in ipairs(entries) do rawValues[entry.id] = 1 end
+        rawTotal = #entries
+    end
+
+    local used = 0
+    for _, entry in ipairs(entries) do
+        local exact = targetTotal * (math.max(0, tonumber(rawValues[entry.id]) or 0) / rawTotal)
+        local floored = math.floor((exact * 10) + 0.000001) / 10
+        result[entry.id] = floored
+        used = used + floored
+    end
+
+    local remainingTenths = math.floor((((targetTotal - used) * 10) + 0.5))
+    local index = 1
+    while remainingTenths > 0 and #entries > 0 do
+        local entry = entries[index]
+        result[entry.id] = RoundPercent((result[entry.id] or 0) + 0.1)
+        remainingTenths = remainingTenths - 1
+        index = index + 1
+        if index > #entries then index = 1 end
+    end
+    return result
+end
+
+local function NormalizeProjectWeights(state, changedProjectId, changedValue)
+    local entries = GetAllocationProjects()
+    state.projectWeights = state.projectWeights or {}
+
+    local valid = {}
+    for _, entry in ipairs(entries) do valid[entry.id] = true end
+    for id in pairs(state.projectWeights) do
+        if not valid[tostring(id)] then state.projectWeights[id] = nil end
+    end
+
+    if #entries == 0 then return entries end
+    if #entries == 1 then
+        state.projectWeights[entries[1].id] = 100
+        return entries
+    end
+
+    local changedId = changedProjectId and tostring(changedProjectId) or nil
+    if changedId and valid[changedId] then
+        local newValue = RoundPercent(changedValue)
+        state.projectWeights[changedId] = newValue
+
+        local others, raw = {}, {}
+        for _, entry in ipairs(entries) do
+            if entry.id ~= changedId then
+                others[#others + 1] = entry
+                raw[entry.id] = math.max(0, tonumber(state.projectWeights[entry.id]) or 0)
+            end
+        end
+        local redistributed = NormalizeValues(raw, others, 100 - newValue)
+        for id, value in pairs(redistributed) do state.projectWeights[id] = value end
+        return entries
+    end
+
+    local raw = {}
+    for _, entry in ipairs(entries) do
+        raw[entry.id] = math.max(0, tonumber(state.projectWeights[entry.id]) or 0)
+    end
+    local normalized = NormalizeValues(raw, entries, 100)
+    for id, value in pairs(normalized) do state.projectWeights[id] = value end
+    return entries
+end
+
+local function BuildEffectiveSplits(state, entries)
+    local projectPool = RoundPercent(100 - RoundPercent(state.reservePercent or 0))
+    local raw = {}
+    for _, entry in ipairs(entries) do
+        raw[entry.id] = math.max(0, tonumber(state.projectWeights[entry.id]) or 0)
+    end
+    return NormalizeValues(raw, entries, projectPool), projectPool
+end
+
+local function ApplyEffectiveProjectAllocations(state)
+    if not IRS.SetProjectAllocationPercent then return end
+    local entries = NormalizeProjectWeights(state)
+    local splits = BuildEffectiveSplits(state, entries)
+    for _, entry in ipairs(entries) do
+        IRS:SetProjectAllocationPercent(entry.objectId, splits[entry.id] or 0)
+    end
+end
+
 local function EnsureToolsDB()
     if not IRS.db then IRS:EnsureDB() end
     IRS.db.tools = IRS.db.tools or {}
@@ -38,139 +149,106 @@ local function EnsureToolsDB()
 
     local state = IRS.db.tools.distribution
     IRS.db.migrations = IRS.db.migrations or {}
+    state.projectWeights = state.projectWeights or {}
+    state.reservePercent = RoundPercent(state.reservePercent or 0)
 
-    -- v1.1.1: the Profit Distributor no longer owns a second set of Project
-    -- percentages. Migrate any saved calculator values into the Projects once,
-    -- then use project.allocationPercent as the single source of truth.
-    if not IRS.db.migrations.profitDistributionProjectAuthority111 then
-        for goalId, savedWeight in pairs(state.weights or {}) do
-            local projectId = tostring(goalId):match("^project:(.+)$")
-            if projectId and IRS.SetProjectAllocationPercent then
-                IRS:SetProjectAllocationPercent(
-                    tonumber(projectId) or projectId,
-                    savedWeight
-                )
-            end
+    if not IRS.db.migrations.projectAllocationPlan120 then
+        local legacyWeights = state.weights or {}
+        for _, entry in ipairs(GetAllocationProjects()) do
+            local legacyId = "project:" .. entry.id
+            local seed = legacyWeights[legacyId]
+            if seed == nil then seed = tonumber(entry.project.allocationPercent) or 0 end
+            state.projectWeights[entry.id] = math.max(0, tonumber(seed) or 0)
         end
-
-        IRS.db.migrations.profitDistributionProjectAuthority111 = Now()
+        NormalizeProjectWeights(state)
+        state.weights = nil
+        IRS.db.migrations.projectAllocationPlan120 = Now()
     end
 
-    state.weights = nil
-
-    IRS.db.ui = IRS.db.ui or {}
-    IRS.db.ui.toolsSection = IRS.db.ui.toolsSection or "manual"
+    NormalizeProjectWeights(state)
+    ApplyEffectiveProjectAllocations(state)
 
     if state.baselineTotal == nil then
         local earnings = IRS:GetCurrentEarnings()
         local total = math.floor(tonumber(earnings.total) or 0)
         local today = math.floor(tonumber(earnings.today) or 0)
-
-        -- First use starts with today's positive net profit available. Historical
-        -- IRS totals before today are treated as already handled rather than
-        -- suddenly becoming a giant distribution obligation after upgrading.
         state.baselineTotal = total - math.max(0, today)
         state.initializedDay = TodayKey()
         state.initializedFromToday = true
     end
-
     return state
+end
+
+function IRS:SyncProjectDistributionPlan()
+    local state = EnsureToolsDB()
+    NormalizeProjectWeights(state)
+    ApplyEffectiveProjectAllocations(state)
+    if IRS.RefreshProjectAllocationPage then IRS:RefreshProjectAllocationPage() end
+    return true
+end
+
+function IRS:SetProjectDistributionPercent(projectId, value)
+    local state = EnsureToolsDB()
+    local entries = NormalizeProjectWeights(state, projectId, value)
+    local found = false
+    for _, entry in ipairs(entries) do
+        if entry.id == tostring(projectId) then found = true; break end
+    end
+    if not found then return false end
+
+    ApplyEffectiveProjectAllocations(state)
+    if IRS.RefreshProjectsPage then IRS:RefreshProjectsPage(true) end
+    if IRS.RefreshMiniDashboard then IRS:RefreshMiniDashboard() end
+    return true
+end
+
+function IRS:SetProfitDistributionWeight(goalId, value)
+    local projectId = tostring(goalId or ""):match("^project:(.+)$")
+    if not projectId then return false end
+    return IRS:SetProjectDistributionPercent(tonumber(projectId) or projectId, value)
+end
+
+function IRS:SetProfitDistributionReservePercent(value)
+    local state = EnsureToolsDB()
+    value = tonumber(value)
+    if not value then return false end
+    state.reservePercent = RoundPercent(value)
+    ApplyEffectiveProjectAllocations(state)
+    if IRS.RefreshProjectsPage then IRS:RefreshProjectsPage(true) end
+    if IRS.RefreshMiniDashboard then IRS:RefreshMiniDashboard() end
+    return true
 end
 
 function IRS:GetProfitDistributionGoals()
     local state = EnsureToolsDB()
-    local rows = {}
-    local completed = 0
-    local unavailable = 0
+    local entries = NormalizeProjectWeights(state)
+    local splits, projectPool = BuildEffectiveSplits(state, entries)
+    local rows, completed, unavailable = {}, 0, 0
 
-    if IRS.GetSortedProjects then
-        for _, entry in ipairs(IRS:GetSortedProjects()) do
-            local project = entry.project
-            if project and not project.convertedToReserveId then
-                local stats = IRS:GetProjectStats(project)
-                if not stats or not stats.available then
-                    unavailable = unavailable + 1
-                elseif (tonumber(stats.remaining) or 0) > 0 then
-                    local goalId = "project:" .. tostring(entry.id)
-                    local defaultWeight = math.max(0, tonumber(project.allocationPercent) or 0)
-                    table.insert(rows, {
-                        id = goalId,
-                        objectId = entry.id,
-                        kind = "PROJECT",
-                        name = project.name or "Savings Project",
-                        weight = defaultWeight,
-                        defaultWeight = defaultWeight,
-                        need = math.max(0, math.floor(tonumber(stats.remaining) or 0)),
-                        sourceLabel = stats.sourceLabel or "Unknown Source",
-                    })
-                else
-                    completed = completed + 1
-                end
-            end
-        end
+    for _, entry in ipairs(entries) do
+        local project = entry.project
+        local stats = IRS:GetProjectStats(project)
+        local available = stats and stats.available == true
+        local need = stats and math.max(0, math.floor(tonumber(stats.remaining) or 0))
+            or math.max(0, math.floor(tonumber(project.targetCopper) or 0))
+        local isCompleted = available and need <= 0
+        if isCompleted then completed = completed + 1 end
+        if not available then unavailable = unavailable + 1 end
+
+        rows[#rows + 1] = {
+            id = "project:" .. entry.id,
+            objectId = entry.objectId,
+            kind = "PROJECT",
+            name = project.name or "Savings Project",
+            weight = RoundPercent(state.projectWeights[entry.id] or 0),
+            splitPercent = RoundPercent(splits[entry.id] or 0),
+            need = need,
+            available = available,
+            completed = isCompleted,
+            sourceLabel = stats and stats.sourceLabel or "Source unavailable",
+        }
     end
-
-    table.sort(rows, function(a, b)
-        if a.kind == b.kind then return tostring(a.name) < tostring(b.name) end
-        return a.kind < b.kind
-    end)
-
-    return rows, completed, unavailable
-end
-
-local function AllocateWithCaps(totalCopper, goals)
-    totalCopper = math.max(0, math.floor(tonumber(totalCopper) or 0))
-
-    local result = {}
-    local totalPercent = 0
-    for i, goal in ipairs(goals or {}) do
-        result[i] = 0
-        totalPercent = totalPercent + math.max(0, tonumber(goal.weight) or 0)
-    end
-
-    -- Allocation % is literal while the total is 100% or less. If the user
-    -- deliberately configures more than 100% across active Projects, scale the
-    -- calculator suggestion back to 100% so it can never suggest more gold than
-    -- actually exists. Project source views still keep their entered values.
-    local scale = totalPercent > 100 and (100 / totalPercent) or 1
-    local used = 0
-
-    for i, goal in ipairs(goals or {}) do
-        local weight = math.max(0, tonumber(goal.weight) or 0)
-        local need = math.max(0, math.floor(tonumber(goal.need) or 0))
-        local effectivePercent = weight * scale
-        local share = math.floor(totalCopper * (effectivePercent / 100))
-        share = math.min(need, share)
-
-        result[i] = share
-        used = used + share
-    end
-
-    return result, math.max(0, totalCopper - used)
-end
-
-function IRS:SetProfitDistributionWeight(goalId, value)
-    EnsureToolsDB()
-
-    goalId = tostring(goalId or "")
-    local projectId = goalId:match("^project:(.+)$")
-    if not projectId or not IRS.SetProjectAllocationPercent then return false end
-
-    value = tonumber(value)
-    if not value then return false end
-    value = math.max(0, math.min(100, value))
-    value = math.floor((value * 10) + 0.5) / 10
-
-    local ok = IRS:SetProjectAllocationPercent(
-        tonumber(projectId) or projectId,
-        value
-    )
-
-    if ok and IRS.RefreshMiniDashboard then
-        IRS:RefreshMiniDashboard()
-    end
-
-    return ok == true
+    return rows, completed, unavailable, projectPool
 end
 
 function IRS:GetProfitDistribution()
@@ -180,47 +258,38 @@ function IRS:GetProfitDistribution()
     local baselineTotal = math.floor(tonumber(state.baselineTotal) or currentTotal)
     local netSince = currentTotal - baselineTotal
     local profit = math.max(0, netSince)
-    local goals, completed, unavailable = IRS:GetProfitDistributionGoals()
+    local goals, completed, unavailable, projectPool = IRS:GetProfitDistributionGoals()
 
-    local totalWeight = 0
-    for _, goal in ipairs(goals) do totalWeight = totalWeight + math.max(0, tonumber(goal.weight) or 0) end
+    local reservePercent = RoundPercent(state.reservePercent or 0)
+    local reserveSuggested = math.floor(profit * (reservePercent / 100))
+    local rows, distributed = {}, reserveSuggested
 
-    local allocations, remainder = AllocateWithCaps(profit, goals)
-    local rows = {}
-    local distributed = 0
-    for i, goal in ipairs(goals) do
-        local amount = math.max(0, math.floor(tonumber(allocations[i]) or 0))
+    for _, goal in ipairs(goals) do
+        local amount = 0
+        if goal.available and not goal.completed then
+            amount = math.floor(profit * ((tonumber(goal.splitPercent) or 0) / 100))
+            amount = math.min(goal.need, math.max(0, amount))
+        end
         distributed = distributed + amount
         rows[#rows + 1] = {
-            id = goal.id,
-            kind = goal.kind,
-            name = goal.name,
-            weight = goal.weight,
-            defaultWeight = goal.defaultWeight,
-            normalizedPercent = totalWeight > 100
-                and ((goal.weight / totalWeight) * 100)
-                or math.max(0, tonumber(goal.weight) or 0),
-            need = goal.need,
-            suggested = amount,
-            needAfter = math.max(0, goal.need - amount),
-            sourceLabel = goal.sourceLabel,
+            id=goal.id, objectId=goal.objectId, kind=goal.kind, name=goal.name,
+            weight=goal.weight, normalizedPercent=goal.splitPercent, splitPercent=goal.splitPercent,
+            need=goal.need, suggested=amount, needAfter=math.max(0, goal.need-amount),
+            sourceLabel=goal.sourceLabel, available=goal.available, completed=goal.completed,
         }
     end
 
     return {
-        baselineTotal = baselineTotal,
-        currentTotal = currentTotal,
-        netSince = netSince,
-        availableProfit = profit,
-        distributed = distributed,
-        remainder = math.max(0, remainder),
-        totalWeight = totalWeight,
-        rows = rows,
-        completedExcluded = completed,
-        unavailableExcluded = unavailable,
-        lastAllocationAt = tonumber(state.lastAllocationAt),
-        initializedDay = state.initializedDay,
-        initializedFromToday = state.initializedFromToday == true,
+        baselineTotal=baselineTotal, currentTotal=currentTotal, netSince=netSince,
+        availableProfit=profit, distributed=math.max(0, distributed),
+        remainder=math.max(0, profit-distributed),
+        totalWeight=#rows > 0 and 100 or 0,
+        reservePercent=reservePercent, reserveSuggested=reserveSuggested,
+        projectPoolPercent=projectPool, rows=rows,
+        completedExcluded=completed, unavailableExcluded=unavailable,
+        lastAllocationAt=tonumber(state.lastAllocationAt),
+        initializedDay=state.initializedDay,
+        initializedFromToday=state.initializedFromToday == true,
     }
 end
 
@@ -228,25 +297,24 @@ function IRS:MarkProfitsAllocated()
     local state = EnsureToolsDB()
     local distribution = IRS:GetProfitDistribution()
     local now = Now()
-
     local allocationSnapshot = {}
+
     for _, row in ipairs(distribution.rows or {}) do
         allocationSnapshot[#allocationSnapshot + 1] = {
-            id = row.id,
-            name = row.name,
-            kind = row.kind,
-            weight = row.weight,
-            normalizedPercent = row.normalizedPercent,
-            suggestedCopper = row.suggested,
+            id=row.id, name=row.name, kind=row.kind,
+            distributionPercent=row.weight, splitPercent=row.splitPercent,
+            suggestedCopper=row.suggested,
         }
     end
 
     table.insert(state.history, 1, {
-        allocatedAt = now,
-        amountCopper = math.max(0, tonumber(distribution.availableProfit) or 0),
-        netSinceCopper = tonumber(distribution.netSince) or 0,
-        totalRecordedCopper = tonumber(distribution.currentTotal) or 0,
-        allocations = allocationSnapshot,
+        allocatedAt=now,
+        amountCopper=math.max(0, tonumber(distribution.availableProfit) or 0),
+        netSinceCopper=tonumber(distribution.netSince) or 0,
+        totalRecordedCopper=tonumber(distribution.currentTotal) or 0,
+        reservePercent=distribution.reservePercent,
+        reserveSuggestedCopper=distribution.reserveSuggested,
+        allocations=allocationSnapshot,
     })
     while #state.history > 20 do table.remove(state.history) end
 
@@ -256,24 +324,16 @@ function IRS:MarkProfitsAllocated()
     return true
 end
 
-function IRS:SetToolsSection(section)
-    EnsureToolsDB()
-    section = section == "distribution" and "distribution" or "manual"
-    IRS.db.ui.toolsSection = section
+function IRS:SetToolsSection()
     if IRS.RefreshToolsPage then IRS:RefreshToolsPage() end
 end
 
--- Logic above can be smoke-tested without loading WoW UI objects. The visual
--- tree is deliberately deferred until the addon's shared page containers and
--- scrolling wrappers are finished loading.
+
 local function BuildToolsUI()
     local page = IRS.toolsPage
-    if not page then return false end
+    local distributionView = IRS.projectAllocationView
+    if not page or not distributionView then return false end
     if page._irsToolsUIBuilt then return true end
-
--- ---------------------------------------------------------------------------
--- UI HELPERS
--- ---------------------------------------------------------------------------
 
 local function SetColor(fs, color)
     fs:SetTextColor(color[1], color[2], color[3], color[4] or 1)
@@ -292,11 +352,7 @@ end
 
 local function MakePanel(parent, color)
     local frame = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-    frame:SetBackdrop({
-        bgFile = "Interface/Buttons/WHITE8X8",
-        edgeFile = "Interface/Buttons/WHITE8X8",
-        edgeSize = 2,
-    })
+    frame:SetBackdrop({bgFile="Interface/Buttons/WHITE8X8",edgeFile="Interface/Buttons/WHITE8X8",edgeSize=2})
     local c = color or COLORS.panelAlt
     frame:SetBackdropColor(c[1], c[2], c[3], c[4] or 1)
     frame:SetBackdropBorderColor(unpack(COLORS.borderSoft))
@@ -307,11 +363,7 @@ local function MakeButton(parent, text, x, y, width)
     local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
     button:SetPoint("TOPLEFT", x, y)
     button:SetSize(width, 30)
-    button:SetBackdrop({
-        bgFile = "Interface/Buttons/WHITE8X8",
-        edgeFile = "Interface/Buttons/WHITE8X8",
-        edgeSize = 2,
-    })
+    button:SetBackdrop({bgFile="Interface/Buttons/WHITE8X8",edgeFile="Interface/Buttons/WHITE8X8",edgeSize=2})
     button:SetBackdropColor(unpack(COLORS.panelAlt))
     button:SetBackdropBorderColor(unpack(COLORS.borderSoft))
     button.label = MakeText(button, "helper", COLORS.text, "CENTER")
@@ -330,28 +382,22 @@ local function WholeGold(copper, signed)
     return text .. "g"
 end
 
+local function PercentText(value)
+    return string.format("%.1f", tonumber(value) or 0):gsub("%.0$", "") .. "%"
+end
+
 local title = MakeText(page, "page", COLORS.goldSoft, "LEFT")
 title:SetPoint("TOPLEFT", 4, -4)
 title:SetText("TOOLS")
 
 local subtitle = MakeText(page, "body", COLORS.muted, "LEFT")
 subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -3)
-subtitle:SetText("Reference IRS systems or calculate how unallocated net profit should be divided among active Savings Projects.")
-
-local manualTab = MakeButton(page, "USER'S MANUAL", 4, -55, 150)
-local distributionTab = MakeButton(page, "PROFIT DISTRIBUTION", 164, -55, 180)
+subtitle:SetText("Reference IRS systems and addon behavior. Savings allocation now lives under Projects > Allocation.")
 
 local manualView = CreateFrame("Frame", nil, page)
-manualView:SetPoint("TOPLEFT", 4, -96)
+manualView:SetPoint("TOPLEFT", 4, -55)
 manualView:SetPoint("BOTTOMRIGHT", -4, 4)
 
-local distributionView = CreateFrame("Frame", nil, page)
-distributionView:SetPoint("TOPLEFT", 4, -96)
-distributionView:SetPoint("BOTTOMRIGHT", -4, 4)
-
--- ---------------------------------------------------------------------------
--- USER MANUAL
--- ---------------------------------------------------------------------------
 local manualHeading = MakeText(manualView, "section", COLORS.goldSoft, "LEFT")
 manualHeading:SetPoint("TOPLEFT", 0, 0)
 manualHeading:SetText("IRS USER'S MANUAL")
@@ -382,7 +428,7 @@ local MANUAL_SECTIONS = {
     },
     {
         "SAVINGS PROJECTS",
-        "Projects answer: 'Can I reach X gold by Y date?' Set a name, target, Start Date, Deadline, source, and Allocation %. Current Allocated is the selected source balance multiplied by Allocation %. The same Allocation % is also used by Profit Distribution, so changing it in either place changes the active Project split everywhere. Daily Needed is based on remaining gold and remaining days. Project history is read from IRS's central source history, so editing a Project no longer deletes financial observations. Source/allocation changes are dated configuration changes rather than rewritten history."
+        "Savings Projects now have two tabs. Project Management stores the goal itself: name, target, Start Date, Deadline, funding source, checkpoints, progress, and history. Allocation is account-wide planning: every Project has a linked Distribution % slider and the Project sliders always total 100%. Project Management no longer has an editable Allocation % field. The calculated Split % from the Allocation tab is what IRS uses when attributing a shared source balance to each Project."
     },
     {
         "PROJECT HISTORY & CHECKPOINTS",
@@ -394,7 +440,7 @@ local MANUAL_SECTIONS = {
     },
     {
         "PROFIT DISTRIBUTION CALCULATOR",
-        "The calculator uses IRS net profit accumulated since the last manual allocation checkpoint and distributes it across active Savings Projects only. Distribution % is the Project's actual Allocation %, not a separate calculator-only value, so changing it here also changes the Project's current savings allocation. Totals below 100% intentionally leave the unused percentage Unallocated. If active Project percentages exceed 100%, calculator suggestions are proportionally scaled back to 100% so IRS never suggests moving more gold than is available. Suggestions are capped at each Project's remaining need; excess stays Unallocated. Reserve Funds are intentionally excluded because they maintain standing balances rather than competing for project savings. After physically moving the suggested gold, press MARK ALLOCATED. IRS records the current Total Recorded value as the new checkpoint and immediately begins accumulating only later net profit. Internal transfers do not change the profit pool."
+        "Profit Distribution now lives in Savings Projects > Allocation. Distribution % is each Project's share of the Project pool; moving one slider automatically redistributes the remaining percentage across the other Projects so the Project Distribution total stays exactly 100%. Reserve % is a separate manual entry taken from total profit first. Split % is the calculated effective share of total profit after that Reserve carve-out. For example, a 10% Reserve leaves a 90% Project pool, so a 75% Project Distribution becomes a 67.5% Split. Suggested gold uses Split %, caps Project suggestions at remaining need, and shows the Reserve suggestion separately. After physically moving the suggested gold, press MARK ALLOCATED to start a new profit checkpoint."
     },
     {
         "CHARACTERS",
@@ -438,7 +484,7 @@ for _, section in ipairs(MANUAL_SECTIONS) do
     body:SetWordWrap(true)
     body:SetNonSpaceWrap(false)
     body:SetText(section[2])
-    manualWidgets[#manualWidgets + 1] = {heading = heading, body = body}
+    manualWidgets[#manualWidgets + 1] = {heading=heading, body=body}
 end
 
 local function LayoutManual()
@@ -450,7 +496,6 @@ local function LayoutManual()
         widget.heading:SetPoint("TOPLEFT", manualChild, "TOPLEFT", 4, -y)
         widget.heading:SetWidth(width - 8)
         y = y + math.max(20, IRS:GetFontSize("main", "label") + 7)
-
         widget.body:ClearAllPoints()
         widget.body:SetPoint("TOPLEFT", manualChild, "TOPLEFT", 4, -y)
         widget.body:SetWidth(width - 8)
@@ -460,34 +505,29 @@ local function LayoutManual()
     manualChild:SetHeight(math.max(1, y + 6))
 end
 
--- ---------------------------------------------------------------------------
--- PROFIT DISTRIBUTION
--- ---------------------------------------------------------------------------
 local distHeading = MakeText(distributionView, "section", COLORS.goldSoft, "LEFT")
 distHeading:SetPoint("TOPLEFT", 0, 0)
-distHeading:SetText("PROFIT DISTRIBUTION CALCULATOR")
+distHeading:SetText("PROJECT ALLOCATION")
 
 local distNote = MakeText(distributionView, "helper", COLORS.muted, "LEFT")
 distNote:SetPoint("TOPLEFT", distHeading, "BOTTOMLEFT", 0, -4)
 distNote:SetPoint("TOPRIGHT", -4, 0)
 distNote:SetWordWrap(true)
-distNote:SetText("Splits positive IRS NET profit since the last allocation checkpoint across active Savings Projects only. Edit Distribution % here without changing the Project itself; eligible values are normalized as a whole.")
+distNote:SetText("Each Project has its own linked Distribution slider. Project Distribution always totals 100%. Reserve % is removed from total profit first; Split % is each Project's effective share after that reserve carve-out.")
 
 local summary = MakePanel(distributionView, COLORS.panel)
-summary:SetPoint("TOPLEFT", 0, -64)
-summary:SetPoint("TOPRIGHT", 0, -64)
+summary:SetPoint("TOPLEFT", 0, -58)
+summary:SetPoint("TOPRIGHT", 0, -58)
 summary:SetHeight(112)
 
 local lastLabel = MakeText(summary, "helper", COLORS.goldSoft, "LEFT")
 lastLabel:SetPoint("TOPLEFT", 12, -10); lastLabel:SetText("LAST ALLOCATION")
 local lastValue = MakeText(summary, "body", COLORS.text, "LEFT")
 lastValue:SetPoint("TOPLEFT", lastLabel, "BOTTOMLEFT", 0, -5)
-
 local netLabel = MakeText(summary, "helper", COLORS.goldSoft, "CENTER")
 netLabel:SetPoint("TOP", 0, -10); netLabel:SetText("NET SINCE LAST ALLOCATION")
 local netValue = MakeText(summary, "value", COLORS.text, "CENTER")
 netValue:SetPoint("TOP", netLabel, "BOTTOM", 0, -3)
-
 local availableLabel = MakeText(summary, "helper", COLORS.goldSoft, "RIGHT")
 availableLabel:SetPoint("TOPRIGHT", -12, -10); availableLabel:SetText("AVAILABLE TO DISTRIBUTE")
 local availableValue = MakeText(summary, "value", COLORS.green, "RIGHT")
@@ -497,297 +537,275 @@ local checkpoint = MakeButton(summary, "MARK ALLOCATED", 8, -76, 145)
 local checkpointHint = MakeText(summary, "helper", COLORS.muted, "LEFT")
 checkpointHint:SetPoint("LEFT", checkpoint, "RIGHT", 10, 0)
 checkpointHint:SetPoint("RIGHT", summary, "RIGHT", -10, 0)
-checkpointHint:SetText("After moving the suggested gold, save this point. Only later net profit will accumulate for the next distribution.")
+checkpointHint:SetText("After moving the suggested gold, save this point. Only later net profit accumulates for the next distribution.")
 
 local tableHeader = MakePanel(distributionView, COLORS.panelAlt)
 tableHeader:SetPoint("TOPLEFT", summary, "BOTTOMLEFT", 0, -12)
--- Leave the scrollbar gutter outside the table itself so the header and data
--- rows share exactly the same usable width.
 tableHeader:SetPoint("TOPRIGHT", summary, "BOTTOMRIGHT", -22, -12)
 tableHeader:SetHeight(30)
 
 local headerGoal = MakeText(tableHeader, "helper", COLORS.goldSoft, "LEFT")
 local headerDestination = MakeText(tableHeader, "helper", COLORS.goldSoft, "LEFT")
-local headerWeight = MakeText(tableHeader, "helper", COLORS.goldSoft, "RIGHT")
+local headerWeight = MakeText(tableHeader, "helper", COLORS.goldSoft, "CENTER")
 local headerShare = MakeText(tableHeader, "helper", COLORS.goldSoft, "RIGHT")
 local headerSuggested = MakeText(tableHeader, "helper", COLORS.goldSoft, "RIGHT")
 local headerNeed = MakeText(tableHeader, "helper", COLORS.goldSoft, "RIGHT")
-headerGoal:SetText("GOAL"); headerDestination:SetText("ALLOCATE TO"); headerWeight:SetText("DISTRIBUTION %")
+headerGoal:SetText("PROJECT"); headerDestination:SetText("ALLOCATE TO"); headerWeight:SetText("DISTRIBUTION %")
 headerShare:SetText("SPLIT %"); headerSuggested:SetText("SUGGESTED"); headerNeed:SetText("NEED AFTER")
 
 local listScroll = CreateFrame("ScrollFrame", "IncomeRecordsSystemDistributionScroll", distributionView, "UIPanelScrollFrameTemplate")
 listScroll:SetPoint("TOPLEFT", tableHeader, "BOTTOMLEFT", 0, -2)
 listScroll:SetPoint("TOPRIGHT", tableHeader, "BOTTOMRIGHT", -22, -2)
-listScroll:SetHeight(250)
+listScroll:SetHeight(235)
 local listChild = CreateFrame("Frame", nil, listScroll)
 listChild:SetSize(780, 1)
 listScroll:SetScrollChild(listChild)
 
-local footerLine = MakeText(distributionView, "body", COLORS.text, "LEFT")
-footerLine:SetPoint("TOPLEFT", listScroll, "BOTTOMLEFT", 0, -10)
-footerLine:SetPoint("TOPRIGHT", -4, -10)
-local footerHint = MakeText(distributionView, "helper", COLORS.muted, "LEFT")
-footerHint:SetPoint("TOPLEFT", footerLine, "BOTTOMLEFT", 0, -5)
-footerHint:SetPoint("TOPRIGHT", -4, -5)
-footerHint:SetWordWrap(true)
-
 local distRows = {}
 local function EnsureDistRow(index)
     if distRows[index] then return distRows[index] end
-    local row = CreateFrame("Button", nil, listChild, "BackdropTemplate")
-    row:SetHeight(38)
-    row:SetBackdrop({bgFile="Interface/Buttons/WHITE8X8", edgeFile="Interface/Buttons/WHITE8X8", edgeSize=1})
-    row:SetBackdropColor(COLORS.panel[1], COLORS.panel[2], COLORS.panel[3], 0.50)
-    row:SetBackdropBorderColor(COLORS.borderSoft[1], COLORS.borderSoft[2], COLORS.borderSoft[3], 0.55)
+    local row = CreateFrame("Frame", nil, listChild, "BackdropTemplate")
+    row:SetHeight(42)
+    row:SetBackdrop({bgFile="Interface/Buttons/WHITE8X8",edgeFile="Interface/Buttons/WHITE8X8",edgeSize=1})
+    row:SetBackdropColor(COLORS.panel[1],COLORS.panel[2],COLORS.panel[3],0.50)
+    row:SetBackdropBorderColor(COLORS.borderSoft[1],COLORS.borderSoft[2],COLORS.borderSoft[3],0.55)
     row.goal = MakeText(row, "body", COLORS.text, "LEFT")
     row.destination = MakeText(row, "helper", COLORS.muted, "LEFT")
-    row.weight = CreateFrame("EditBox", nil, row, "InputBoxTemplate")
-    row.weight:SetAutoFocus(false)
-    row.weight:SetJustifyH("RIGHT")
-    row.weight:SetFontObject(GameFontHighlightSmall)
-    row.weight:SetMaxLetters(5)
-    row.weight:SetNumeric(false)
+
+    local sliderName = "IncomeRecordsSystemProjectDistributionSlider" .. tostring(index)
+    row.slider = CreateFrame("Slider", sliderName, row, "OptionsSliderTemplate")
+    row.slider:SetMinMaxValues(0,100)
+    row.slider:SetValueStep(0.1)
+    if row.slider.SetObeyStepOnDrag then row.slider:SetObeyStepOnDrag(true) end
+    local low=_G[sliderName.."Low"]; if low then low:SetText("") end
+    local high=_G[sliderName.."High"]; if high then high:SetText("") end
+    local sliderText=_G[sliderName.."Text"]; if sliderText then sliderText:SetText("") end
+
+    row.sliderValue = MakeText(row, "helper", COLORS.goldSoft, "RIGHT")
     row.share = MakeText(row, "body", COLORS.text, "RIGHT")
     row.suggested = MakeText(row, "body", COLORS.gold, "RIGHT")
     row.need = MakeText(row, "body", COLORS.muted, "RIGHT")
+
+    row.slider:SetScript("OnValueChanged", function(self, value)
+        row.sliderValue:SetText(PercentText(value))
+        if not row._refreshing then row._pendingWeight=value end
+    end)
+    row.slider:SetScript("OnMouseUp", function()
+        if not row.data or row._refreshing then return end
+        local value=row._pendingWeight or row.slider:GetValue()
+        row._pendingWeight=nil
+        if IRS:SetProfitDistributionWeight(row.data.id,value) then IRS:RefreshProjectAllocationPage() end
+    end)
+
     row:SetScript("OnEnter", function(self)
         if not self.data then return end
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText(self.data.name or "Goal")
-        GameTooltip:AddLine(
-            (self.data.kind == "PROJECT" and "Project" or "Reserve")
-                .. "  •  Allocate to: "
-                .. (self.data.sourceLabel or "Unknown Source"),
-            0.68, 0.62, 0.51
-        )
-        GameTooltip:AddLine(string.format("Project allocation: %.1f%%", self.data.weight or 0), 0.88, 0.84, 0.75)
-        GameTooltip:AddLine("Suggested: " .. WholeGold(self.data.suggested or 0), 0.86, 0.71, 0.36)
+        GameTooltip:SetOwner(self,"ANCHOR_RIGHT")
+        GameTooltip:SetText(self.data.name or "Savings Project")
+        GameTooltip:AddLine("Distribution: "..PercentText(self.data.weight),0.88,0.84,0.75)
+        GameTooltip:AddLine("Split of total profit: "..PercentText(self.data.splitPercent),0.88,0.84,0.75)
+        GameTooltip:AddLine("Suggested: "..WholeGold(self.data.suggested or 0),0.86,0.71,0.36)
         GameTooltip:Show()
     end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    local function CommitWeight(self)
-        if not row.data then return end
-        local raw = tostring(self:GetText() or ""):gsub("%%", "")
-        local value = tonumber(raw)
-        if value and IRS:SetProfitDistributionWeight(row.data.id, value) then
-            self:ClearFocus()
-            IRS:RefreshToolsPage()
-        else
-            self:SetText(string.format("%.1f", tonumber(row.data.weight) or 0):gsub("%.0$", ""))
-            self:ClearFocus()
-        end
-    end
-    row.weight:SetScript("OnEnterPressed", CommitWeight)
-    row.weight:SetScript("OnEditFocusLost", function(self)
-        if row.data and self:GetText() ~= "" then CommitWeight(self) end
-    end)
-
-    distRows[index] = row
+    distRows[index]=row
     return row
 end
 
-local emptyText = MakeText(listChild, "body", COLORS.muted, "CENTER")
-emptyText:SetPoint("TOPLEFT", 0, -28)
+local emptyText=MakeText(listChild,"body",COLORS.muted,"CENTER")
+emptyText:SetPoint("TOPLEFT",0,-28)
 emptyText:SetWidth(760)
-emptyText:SetText("No active Projects or underfunded Reserves currently need a distribution.")
+emptyText:SetText("No Savings Projects yet. Create one in Project Management.")
+
+local reservePanel=MakePanel(distributionView,COLORS.panelAlt)
+reservePanel:SetPoint("TOPLEFT",listScroll,"BOTTOMLEFT",0,-10)
+reservePanel:SetPoint("TOPRIGHT",tableHeader,"BOTTOMRIGHT",0,-10)
+reservePanel:SetHeight(68)
+
+local reserveTitle=MakeText(reservePanel,"body",COLORS.goldSoft,"LEFT")
+reserveTitle:SetPoint("TOPLEFT",10,-9); reserveTitle:SetText("RESERVES")
+local reserveDetail=MakeText(reservePanel,"helper",COLORS.muted,"LEFT")
+reserveDetail:SetPoint("TOPLEFT",reserveTitle,"BOTTOMLEFT",0,-4)
+reserveDetail:SetText("Manual share of total profit set aside for Reserve Funds before Project Distribution is applied.")
+local reservePercentLabel=MakeText(reservePanel,"helper",COLORS.goldSoft,"RIGHT")
+reservePercentLabel:SetPoint("RIGHT",-250,10); reservePercentLabel:SetText("RESERVE %")
+local reserveInput=CreateFrame("EditBox",nil,reservePanel,"InputBoxTemplate")
+reserveInput:SetSize(62,24); reserveInput:SetPoint("LEFT",reservePercentLabel,"RIGHT",8,0)
+reserveInput:SetAutoFocus(false); reserveInput:SetJustifyH("RIGHT"); reserveInput:SetFontObject(GameFontHighlightSmall)
+reserveInput:SetMaxLetters(5); reserveInput:SetNumeric(false)
+local reserveSplit=MakeText(reservePanel,"body",COLORS.text,"RIGHT")
+reserveSplit:SetPoint("RIGHT",-105,10); reserveSplit:SetWidth(72)
+local reserveSuggested=MakeText(reservePanel,"body",COLORS.gold,"RIGHT")
+reserveSuggested:SetPoint("RIGHT",-10,10); reserveSuggested:SetWidth(92)
+
+local footerLine=MakeText(distributionView,"body",COLORS.text,"LEFT")
+footerLine:SetPoint("TOPLEFT",reservePanel,"BOTTOMLEFT",0,-10); footerLine:SetPoint("TOPRIGHT",-4,-10)
+local footerHint=MakeText(distributionView,"helper",COLORS.muted,"LEFT")
+footerHint:SetPoint("TOPLEFT",footerLine,"BOTTOMLEFT",0,-5); footerHint:SetPoint("TOPRIGHT",-4,-5); footerHint:SetWordWrap(true)
+
+local function CommitReservePercent(self)
+    local raw=tostring(self:GetText() or ""):gsub("%%","")
+    local value=tonumber(raw)
+    if value and IRS:SetProfitDistributionReservePercent(value) then
+        self:ClearFocus(); IRS:RefreshProjectAllocationPage()
+    else
+        local data=IRS:GetProfitDistribution()
+        self:SetText(string.format("%.1f",data.reservePercent or 0):gsub("%.0$",""))
+        self:ClearFocus()
+    end
+end
+reserveInput:SetScript("OnEnterPressed",CommitReservePercent)
+reserveInput:SetScript("OnEditFocusLost",function(self) if self:GetText()~="" then CommitReservePercent(self) end end)
 
 local function LayoutDistributionColumns()
-    -- The table header and scroll child intentionally share one content width.
-    -- Previously the header was wider than the rows by the scrollbar gutter,
-    -- which let NEED AFTER extend through the row's right border.
-    local width = math.max(680, tableHeader:GetWidth() or 780)
-    local childW = math.max(680, (listScroll:GetWidth() or width) - 2)
-    width = math.min(width, childW)
-    local usable = math.max(650, width - 20)
+    local width=math.max(680,tableHeader:GetWidth() or 780)
+    local childW=math.max(680,(listScroll:GetWidth() or width)-2)
+    width=math.min(width,childW)
+    local usable=math.max(650,width-20)
+    local goalW=math.max(135,math.floor(usable*0.19))
+    local destinationW=math.max(120,math.floor(usable*0.17))
+    local weightW=175
+    local shareW=72
+    local suggestW=102
+    local needW=math.max(95,usable-goalW-destinationW-weightW-shareW-suggestW)
 
-    local goalW = math.max(155, math.floor(usable * 0.24))
-    local destinationW = math.max(130, math.floor(usable * 0.20))
-    local weightW = 110
-    local shareW = 75
-    local suggestW = 105
-    local needW = math.max(100, usable - goalW - destinationW - weightW - shareW - suggestW)
+    local x=10
+    headerGoal:ClearAllPoints(); headerGoal:SetPoint("LEFT",x,0); headerGoal:SetWidth(goalW); x=x+goalW
+    headerDestination:ClearAllPoints(); headerDestination:SetPoint("LEFT",x,0); headerDestination:SetWidth(destinationW); x=x+destinationW
+    headerWeight:ClearAllPoints(); headerWeight:SetPoint("LEFT",x,0); headerWeight:SetWidth(weightW); x=x+weightW
+    headerShare:ClearAllPoints(); headerShare:SetPoint("LEFT",x,0); headerShare:SetWidth(shareW); x=x+shareW
+    headerSuggested:ClearAllPoints(); headerSuggested:SetPoint("LEFT",x,0); headerSuggested:SetWidth(suggestW); x=x+suggestW
+    headerNeed:ClearAllPoints(); headerNeed:SetPoint("LEFT",x,0); headerNeed:SetWidth(needW)
 
-    local x = 10
-    headerGoal:ClearAllPoints(); headerGoal:SetPoint("LEFT", x, 0); headerGoal:SetWidth(goalW); x=x+goalW
-    headerDestination:ClearAllPoints(); headerDestination:SetPoint("LEFT", x, 0); headerDestination:SetWidth(destinationW); x=x+destinationW
-    headerWeight:ClearAllPoints(); headerWeight:SetPoint("LEFT", x, 0); headerWeight:SetWidth(weightW); x=x+weightW
-    headerShare:ClearAllPoints(); headerShare:SetPoint("LEFT", x, 0); headerShare:SetWidth(shareW); x=x+shareW
-    headerSuggested:ClearAllPoints(); headerSuggested:SetPoint("LEFT", x, 0); headerSuggested:SetWidth(suggestW); x=x+suggestW
-    headerNeed:ClearAllPoints(); headerNeed:SetPoint("LEFT", x, 0); headerNeed:SetWidth(needW)
-
-    listChild:SetWidth(width)
-    emptyText:SetWidth(width)
-    for _, row in ipairs(distRows) do
+    listChild:SetWidth(width); emptyText:SetWidth(width)
+    for _,row in ipairs(distRows) do
         row:SetWidth(width)
         local rx=10
-        row.goal:ClearAllPoints(); row.goal:SetPoint("LEFT", rx, 0); row.goal:SetWidth(goalW); rx=rx+goalW
-        row.destination:ClearAllPoints(); row.destination:SetPoint("LEFT", rx, 0); row.destination:SetWidth(destinationW); rx=rx+destinationW
-        row.weight:ClearAllPoints(); row.weight:SetPoint("LEFT", rx + 8, 0); row.weight:SetSize(math.max(54, weightW - 16), 24); rx=rx+weightW
-        row.share:ClearAllPoints(); row.share:SetPoint("LEFT", rx, 0); row.share:SetWidth(shareW); rx=rx+shareW
-        row.suggested:ClearAllPoints(); row.suggested:SetPoint("LEFT", rx, 0); row.suggested:SetWidth(suggestW); rx=rx+suggestW
-        row.need:ClearAllPoints(); row.need:SetPoint("LEFT", rx, 0); row.need:SetWidth(needW)
+        row.goal:ClearAllPoints(); row.goal:SetPoint("LEFT",rx,0); row.goal:SetWidth(goalW); rx=rx+goalW
+        row.destination:ClearAllPoints(); row.destination:SetPoint("LEFT",rx,0); row.destination:SetWidth(destinationW); rx=rx+destinationW
+        row.slider:ClearAllPoints(); row.slider:SetPoint("LEFT",rx+4,0); row.slider:SetWidth(math.max(88,weightW-54))
+        row.sliderValue:ClearAllPoints(); row.sliderValue:SetPoint("LEFT",rx+weightW-48,0); row.sliderValue:SetWidth(44); rx=rx+weightW
+        row.share:ClearAllPoints(); row.share:SetPoint("LEFT",rx,0); row.share:SetWidth(shareW); rx=rx+shareW
+        row.suggested:ClearAllPoints(); row.suggested:SetPoint("LEFT",rx,0); row.suggested:SetWidth(suggestW); rx=rx+suggestW
+        row.need:ClearAllPoints(); row.need:SetPoint("LEFT",rx,0); row.need:SetWidth(needW)
     end
 end
 
-local checkpointHover = false
-local checkpointAppearanceRefreshing = false
-
+local checkpointHover=false
+local checkpointAppearanceRefreshing=false
 local function RefreshCheckpointAppearance()
-    -- Enabling or disabling a hovered button can fire OnEnter/OnLeave while this
-    -- function is still running. Ignore that nested appearance refresh and only
-    -- change the enabled state when it actually needs to change.
     if checkpointAppearanceRefreshing then return end
-    checkpointAppearanceRefreshing = true
-
-    local data = IRS:GetProfitDistribution()
-    local enabled = (tonumber(data.availableProfit) or 0) > 0
-
+    checkpointAppearanceRefreshing=true
+    local data=IRS:GetProfitDistribution()
+    local enabled=(tonumber(data.availableProfit) or 0)>0
     if enabled then
-        if not checkpoint:IsEnabled() then
-            checkpoint:Enable()
-        end
+        if not checkpoint:IsEnabled() then checkpoint:Enable() end
         if checkpointHover then
-            checkpoint:SetBackdropColor(0.285, 0.215, 0.135, 0.98)
+            checkpoint:SetBackdropColor(0.285,0.215,0.135,0.98)
             checkpoint:SetBackdropBorderColor(unpack(COLORS.gold))
-            SetColor(checkpoint.label, COLORS.gold)
+            SetColor(checkpoint.label,COLORS.gold)
         else
             checkpoint:SetBackdropColor(unpack(COLORS.panelAlt))
             checkpoint:SetBackdropBorderColor(unpack(COLORS.borderSoft))
-            SetColor(checkpoint.label, COLORS.text)
+            SetColor(checkpoint.label,COLORS.text)
         end
     else
-        if checkpoint:IsEnabled() then
-            checkpoint:Disable()
-        end
-        checkpoint:SetBackdropColor(COLORS.panel[1], COLORS.panel[2], COLORS.panel[3], 0.55)
-        checkpoint:SetBackdropBorderColor(COLORS.borderSoft[1], COLORS.borderSoft[2], COLORS.borderSoft[3], 0.55)
-        SetColor(checkpoint.label, COLORS.muted)
+        if checkpoint:IsEnabled() then checkpoint:Disable() end
+        checkpoint:SetBackdropColor(COLORS.panel[1],COLORS.panel[2],COLORS.panel[3],0.55)
+        checkpoint:SetBackdropBorderColor(COLORS.borderSoft[1],COLORS.borderSoft[2],COLORS.borderSoft[3],0.55)
+        SetColor(checkpoint.label,COLORS.muted)
     end
-
-    checkpointAppearanceRefreshing = false
+    checkpointAppearanceRefreshing=false
 end
 
-checkpoint:SetScript("OnEnter", function()
-    checkpointHover = true
-    RefreshCheckpointAppearance()
-end)
-checkpoint:SetScript("OnLeave", function()
-    checkpointHover = false
-    RefreshCheckpointAppearance()
-end)
-checkpoint:SetScript("OnMouseDown", function(self)
-    if self:IsEnabled() then
-        self:SetBackdropColor(0.32, 0.24, 0.145, 1)
-    end
-end)
-checkpoint:SetScript("OnMouseUp", function()
-    RefreshCheckpointAppearance()
-end)
-checkpoint:SetScript("OnClick", function()
-    local data = IRS:GetProfitDistribution()
-    if (tonumber(data.availableProfit) or 0) <= 0 then return end
+checkpoint:SetScript("OnEnter",function() checkpointHover=true; RefreshCheckpointAppearance() end)
+checkpoint:SetScript("OnLeave",function() checkpointHover=false; RefreshCheckpointAppearance() end)
+checkpoint:SetScript("OnMouseDown",function(self) if self:IsEnabled() then self:SetBackdropColor(0.32,0.24,0.145,1) end end)
+checkpoint:SetScript("OnMouseUp",RefreshCheckpointAppearance)
+checkpoint:SetScript("OnClick",function()
+    local data=IRS:GetProfitDistribution()
+    if (tonumber(data.availableProfit) or 0)<=0 then return end
     IRS:MarkProfitsAllocated()
-    IRS:RefreshToolsPage()
+    IRS:RefreshProjectAllocationPage()
 end)
-
-manualTab:SetScript("OnClick", function() IRS:SetToolsSection("manual") end)
-distributionTab:SetScript("OnClick", function() IRS:SetToolsSection("distribution") end)
 
 function IRS:RefreshToolsLayout()
-    if not page then return end
     LayoutManual()
     LayoutDistributionColumns()
 end
 
 function IRS:RefreshToolsPage()
     EnsureToolsDB()
-    local section = IRS.db.ui.toolsSection == "distribution" and "distribution" or "manual"
-    manualView:SetShown(section == "manual")
-    distributionView:SetShown(section == "distribution")
+    LayoutManual()
+end
 
-    for key, button in pairs({manual=manualTab, distribution=distributionTab}) do
-        local active = key == section
-        button:SetBackdropColor(unpack(active and COLORS.panelAlt or COLORS.panel))
-        button:SetBackdropBorderColor(unpack(active and COLORS.goldSoft or COLORS.borderSoft))
-        SetColor(button.label, active and COLORS.gold or COLORS.text)
-    end
+function IRS:RefreshProjectAllocationPage()
+    EnsureToolsDB()
+    local data=IRS:GetProfitDistribution()
 
-    if section == "manual" then
-        LayoutManual()
-        return
-    end
-
-    local data = IRS:GetProfitDistribution()
     if data.lastAllocationAt then
-        lastValue:SetText(date("%b %d, %Y  %I:%M %p", data.lastAllocationAt))
+        lastValue:SetText(date("%b %d, %Y  %I:%M %p",data.lastAllocationAt))
     elseif data.initializedFromToday then
         lastValue:SetText("Start of today (first use)")
     else
         lastValue:SetText("No checkpoint recorded")
     end
 
-    netValue:SetText(WholeGold(data.netSince, true))
-    if data.netSince > 0 then SetColor(netValue, COLORS.green)
-    elseif data.netSince < 0 then SetColor(netValue, COLORS.red)
-    else SetColor(netValue, COLORS.muted) end
+    netValue:SetText(WholeGold(data.netSince,true))
+    if data.netSince>0 then SetColor(netValue,COLORS.green)
+    elseif data.netSince<0 then SetColor(netValue,COLORS.red)
+    else SetColor(netValue,COLORS.muted) end
 
     availableValue:SetText(WholeGold(data.availableProfit))
-    SetColor(availableValue, data.availableProfit > 0 and COLORS.green or COLORS.muted)
+    SetColor(availableValue,data.availableProfit>0 and COLORS.green or COLORS.muted)
     RefreshCheckpointAppearance()
 
-    for i, item in ipairs(data.rows) do
-        local row = EnsureDistRow(i)
-        row.data = item
+    for i,item in ipairs(data.rows) do
+        local row=EnsureDistRow(i)
+        row.data=item
         row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", listChild, "TOPLEFT", 0, -((i - 1) * 40))
-        row.goal:SetText(item.name)
+        row:SetPoint("TOPLEFT",listChild,"TOPLEFT",0,-((i-1)*44))
+        local suffix=""
+        if item.completed then suffix="  |cff6e995cCOMPLETE|r"
+        elseif not item.available then suffix="  |cff9e4a40UNAVAILABLE|r" end
+        row.goal:SetText((item.name or "Savings Project")..suffix)
         row.destination:SetText(item.sourceLabel or "Unknown source")
-        local weightText = string.format("%.1f", item.weight or 0):gsub("%.0$", "")
-        if not row.weight:HasFocus() then row.weight:SetText(weightText) end
-        row.share:SetText(string.format("%.1f%%", item.normalizedPercent or 0))
+        row._refreshing=true
+        row.slider:SetValue(item.weight or 0)
+        row.sliderValue:SetText(PercentText(item.weight or 0))
+        row._refreshing=false
+        row._pendingWeight=nil
+        row.slider:SetEnabled(#data.rows>1)
+        row.share:SetText(PercentText(item.splitPercent or 0))
         row.suggested:SetText(WholeGold(item.suggested or 0))
         row.need:SetText(WholeGold(item.needAfter or 0))
         row:Show()
     end
     for i=#data.rows+1,#distRows do distRows[i]:Hide(); distRows[i].data=nil end
-    emptyText:SetShown(#data.rows == 0)
-    listChild:SetHeight(math.max(250, (#data.rows * 40) + 4))
+    emptyText:SetShown(#data.rows==0)
+    listChild:SetHeight(math.max(235,(#data.rows*44)+4))
+
+    if not reserveInput:HasFocus() then
+        reserveInput:SetText(string.format("%.1f",data.reservePercent or 0):gsub("%.0$",""))
+    end
+    reserveSplit:SetText("Split "..PercentText(data.reservePercent or 0))
+    reserveSuggested:SetText(WholeGold(data.reserveSuggested or 0))
 
     footerLine:SetText(string.format(
         "Suggested total: %s    •    Unallocated remainder: %s",
-        WholeGold(data.distributed), WholeGold(data.remainder)
+        WholeGold(data.distributed),WholeGold(data.remainder)
     ))
-    local percentageNote
-    if (tonumber(data.totalWeight) or 0) < 100 then
-        percentageNote = string.format(
-            "Project Allocation %% totals %.1f%%; the remaining %.1f%% stays unallocated.",
-            data.totalWeight or 0,
-            math.max(0, 100 - (tonumber(data.totalWeight) or 0))
-        )
-    elseif (tonumber(data.totalWeight) or 0) > 100 then
-        percentageNote = string.format(
-            "Project Allocation %% totals %.1f%%; calculator suggestions are proportionally scaled to 100%%.",
-            data.totalWeight or 0
-        )
-    else
-        percentageNote = "Project Allocation % totals 100%."
-    end
-
     footerHint:SetText(string.format(
-        "%s %d completed Project%s excluded; %d unavailable source%s excluded. A negative net since the checkpoint produces 0g available until the loss is recovered or a new allocation checkpoint is recorded.",
-        percentageNote,
-        data.completedExcluded or 0, (data.completedExcluded or 0) == 1 and "" or "s",
-        data.unavailableExcluded or 0, (data.unavailableExcluded or 0) == 1 and "" or "s"
+        "Project Distribution: %.1f%% of the Project pool • Project pool: %.1f%% of total • Reserves: %.1f%% of total. Split %% is the effective total-profit share after Reserves. Completed or unavailable Projects keep their configured Distribution share but receive a 0g suggestion until adjusted.",
+        data.totalWeight or 0,data.projectPoolPercent or 0,data.reservePercent or 0
     ))
-
     LayoutDistributionColumns()
 end
 
 IRS:RefreshToolsLayout()
 IRS:RefreshToolsPage()
-    page._irsToolsUIBuilt = true
-    return true
+IRS:RefreshProjectAllocationPage()
+page._irsToolsUIBuilt=true
+return true
 end
 
 local function BuildToolsUIForStartup()
