@@ -1572,9 +1572,10 @@ viewLabel:SetPoint("TOPLEFT", 520, -65)
 viewLabel:SetText("VIEW")
 
 local reportViewButtons = {}
-reportViewButtons.history = MakeSmallToggle(reportsPage, "HISTORY", 520, 92, function() reportView = "history"; IRS:RefreshReportsPage() end)
-reportViewButtons.metrics = MakeSmallToggle(reportsPage, "BEST / AVG", 616, 100, function() reportView = "metrics"; IRS:RefreshReportsPage() end)
-reportViewButtons.sources = MakeSmallToggle(reportsPage, "SOURCES", 720, 94, function() reportView = "sources"; IRS:RefreshReportsPage() end)
+reportViewButtons.history = MakeSmallToggle(reportsPage, "HISTORY", 520, 76, function() reportView = "history"; IRS:RefreshReportsPage() end)
+reportViewButtons.metrics = MakeSmallToggle(reportsPage, "BEST/AVG", 600, 84, function() reportView = "metrics"; IRS:RefreshReportsPage() end)
+reportViewButtons.sources = MakeSmallToggle(reportsPage, "SOURCES", 688, 76, function() reportView = "sources"; IRS:RefreshReportsPage() end)
+reportViewButtons.transactions = MakeSmallToggle(reportsPage, "LOG", 768, 76, function() reportView = "transactions"; IRS:RefreshReportsPage() end)
 
 local reportPanel = MakePanel(reportsPage, COLORS.bg)
 reportPanel:SetBackdropBorderColor(0, 0, 0, 0)
@@ -1754,6 +1755,168 @@ for i, info in ipairs(sourceLabels) do
     sourcesView.rows[i] = row
 end
 
+
+local transactionView = CreateFrame("Frame", nil, reportPanel)
+transactionView:SetAllPoints()
+transactionView.title = MakeText(transactionView, 14, COLORS.goldSoft, "LEFT")
+transactionView.title:SetPoint("TOPLEFT", 14, -12)
+transactionView.title:SetText("TRANSACTION LOG — LAST 7 DAYS")
+transactionView.scopeText = MakeText(transactionView, 9, COLORS.muted, "RIGHT")
+transactionView.scopeText:SetPoint("TOPRIGHT", -14, -15)
+transactionView.note = MakeText(transactionView, 9, COLORS.muted, "LEFT")
+transactionView.note:SetPoint("TOPLEFT", 14, -35)
+transactionView.note:SetText(
+    "Each wallet change is retained for seven days with its final IRS classification."
+)
+
+transactionView.header = MakePanel(transactionView, COLORS.panelAlt)
+transactionView.header:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+transactionView.header:SetPoint("TOPLEFT", 12, -58)
+transactionView.header:SetPoint("TOPRIGHT", -28, -58)
+transactionView.header:SetHeight(26)
+
+transactionView.header.time = MakeText(transactionView.header, 9, COLORS.muted, "LEFT")
+transactionView.header.time:SetText("TIME")
+transactionView.header.character = MakeText(transactionView.header, 9, COLORS.muted, "LEFT")
+transactionView.header.character:SetText("CHARACTER")
+transactionView.header.change = MakeText(transactionView.header, 9, COLORS.muted, "RIGHT")
+transactionView.header.change:SetText("WALLET")
+transactionView.header.effect = MakeText(transactionView.header, 9, COLORS.muted, "RIGHT")
+transactionView.header.effect:SetText("IRS EFFECT")
+transactionView.header.kind = MakeText(transactionView.header, 9, COLORS.muted, "LEFT")
+transactionView.header.kind:SetText("CLASSIFICATION")
+
+transactionView.scroll = CreateFrame(
+    "ScrollFrame",
+    nil,
+    transactionView,
+    "UIPanelScrollFrameTemplate"
+)
+transactionView.scroll:SetPoint("TOPLEFT", 12, -88)
+transactionView.scroll:SetPoint("BOTTOMRIGHT", -28, 12)
+
+transactionView.child = CreateFrame("Frame", nil, transactionView.scroll)
+transactionView.child:SetSize(780, 1)
+transactionView.scroll:SetScrollChild(transactionView.child)
+transactionView.rows = {}
+
+transactionView.empty = MakeText(transactionView, 11, COLORS.muted, "CENTER")
+transactionView.empty:SetPoint("CENTER", 0, -10)
+transactionView.empty:SetText(
+    "No wallet transactions have been recorded in the last seven days."
+)
+
+local function EnsureTransactionRow(index)
+    if transactionView.rows[index] then
+        return transactionView.rows[index]
+    end
+
+    local row = CreateFrame(
+        "Frame",
+        nil,
+        transactionView.child,
+        "BackdropTemplate"
+    )
+    row:SetHeight(30)
+    row:SetBackdrop({
+        bgFile = "Interface/Buttons/WHITE8X8",
+        edgeFile = "Interface/Buttons/WHITE8X8",
+        edgeSize = 1,
+    })
+    row:SetBackdropColor(0.21, 0.16, 0.10, 0.30)
+    row:SetBackdropBorderColor(0, 0, 0, 0)
+    row:EnableMouse(true)
+
+    row.time = MakeText(row, 9, COLORS.text, "LEFT")
+    row.character = MakeText(row, 9, COLORS.text, "LEFT")
+    row.change = MakeText(row, 9, COLORS.text, "RIGHT")
+    row.effect = MakeText(row, 9, COLORS.goldSoft, "RIGHT")
+    row.kind = MakeText(row, 9, COLORS.text, "LEFT")
+
+    local line = row:CreateTexture(nil, "BORDER")
+    line:SetTexture("Interface/Buttons/WHITE8X8")
+    line:SetVertexColor(unpack(COLORS.borderSoft))
+    line:SetHeight(1)
+    line:SetPoint("BOTTOMLEFT", 0, 0)
+    line:SetPoint("BOTTOMRIGHT", 0, 0)
+
+    row:SetScript("OnEnter", function(self)
+        local event = self.transactionEvent
+        if not event then return end
+
+        GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
+        GameTooltip:AddLine("IRS Transaction", 0.86, 0.71, 0.36)
+        GameTooltip:AddDoubleLine(
+            "Character",
+            event.characterLabel or "Unknown",
+            0.68, 0.62, 0.51,
+            0.88, 0.84, 0.75
+        )
+        GameTooltip:AddDoubleLine(
+            "Wallet before",
+            FormatGold(event.walletBefore or 0, true)
+        )
+        GameTooltip:AddDoubleLine(
+            "Wallet after",
+            FormatGold(event.walletAfter or 0, true)
+        )
+        GameTooltip:AddDoubleLine(
+            "Raw wallet change",
+            FormatGold(event.rawDelta or 0, true)
+        )
+        GameTooltip:AddDoubleLine(
+            "Applied to IRS",
+            FormatGold(event.ledgerAmount or 0, true)
+        )
+
+        if (tonumber(event.internalAmount) or 0) > 0 then
+            GameTooltip:AddDoubleLine(
+                "Internal transfer",
+                FormatGold(event.internalAmount or 0, true)
+            )
+        end
+
+        if event.fromType or event.toType then
+            local fromText = tostring(event.fromType or "unknown")
+            local toText = tostring(event.toType or "unknown")
+            if event.fromType == "guild" and event.fromKey then
+                fromText = "guild: " .. tostring(event.fromKey)
+            elseif event.fromType == "warband" then
+                fromText = "Warband Bank"
+            elseif event.fromType == "character" then
+                fromText = "Character"
+            end
+            if event.toType == "guild" and event.toKey then
+                toText = "guild: " .. tostring(event.toKey)
+            elseif event.toType == "warband" then
+                toText = "Warband Bank"
+            elseif event.toType == "character" then
+                toText = "Character"
+            end
+            GameTooltip:AddDoubleLine("Movement", fromText .. " → " .. toText)
+        end
+
+        GameTooltip:AddDoubleLine(
+            "Reason",
+            tostring(event.reason or "Unknown")
+        )
+        if event.corrected then
+            GameTooltip:AddLine(
+                "A late storage match corrected the original ledger effect.",
+                0.43, 0.60, 0.36,
+                true
+            )
+        end
+        GameTooltip:Show()
+    end)
+    row:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+
+    transactionView.rows[index] = row
+    return row
+end
+
 -- ============================================================================
 -- SECTION 7 — SETTINGS PAGE SHELL
 -- The Settings interface itself lives in UI\IncomeRecordsSystem_Settings.lua.
@@ -1791,7 +1954,7 @@ local helpHeading = MakeText(helpCommands, 13, COLORS.goldSoft, "LEFT")
 helpHeading:SetPoint("TOPLEFT", 14, -13); helpHeading:SetText("COMMANDS")
 local helpText = MakeText(helpCommands, 11, COLORS.text, "LEFT")
 helpText:SetPoint("TOPLEFT", 14, -44); helpText:SetPoint("RIGHT", -14, 0)
-helpText:SetText("/irs — toggle the IRS window\n\n/irs mini — toggle the floating mini dashboard\n\n/irs projects — open Savings Projects\n\n/irs reserves — open Reserve Funds\n\n/irs chars — open Characters\n\n/irs reports — open Reports\n\n/irs settings — open Settings\n\n/irs help — open this page\n\n/irs scan — rescan the current character\n\n/irs status — print current net periods to chat")
+helpText:SetText("/irs — toggle the IRS window\n\n/irs mini — toggle the floating mini dashboard\n\n/irs projects — open Savings Projects\n\n/irs reserves — open Reserve Funds\n\n/irs chars — open Characters\n\n/irs reports — open Reports\n\n/irs transactions — print recent transaction log\n\n/irs settings — open Settings\n\n/irs help — open this page\n\n/irs scan — rescan the current character\n\n/irs status — print current net periods to chat")
 
 -- ============================================================================
 -- SECTION 9 — REFRESH / CONTROLLER FUNCTIONS
@@ -2010,11 +2173,19 @@ function IRS:RefreshReportsPage()
     historyView:SetShown(reportView == "history")
     metricsView:SetShown(reportView == "metrics")
     sourcesView:SetShown(reportView == "sources")
+    transactionView:SetShown(reportView == "transactions")
+
+    local showPeriods = reportView ~= "transactions"
+    periodLabel:SetShown(showPeriods)
+    for _, button in pairs(reportPeriodButtons) do
+        button:SetShown(showPeriods)
+    end
 
     local scopeName = IRS:GetScopeName(reportScope)
     historyScopeText:SetText(scopeName)
     metricsScopeText:SetText(scopeName)
     sourcesScopeText:SetText(scopeName)
+    transactionView.scopeText:SetText(scopeName)
 
     if reportView == "history" then
         local rows = IRS:GetReportHistory(reportPeriod, scopeKey)
@@ -2032,6 +2203,128 @@ function IRS:RefreshReportsPage()
         end
         for i = #rows + 1, #historyView.rows do historyView.rows[i]:Hide() end
         historyChild:SetHeight(math.max(1, #rows * (historyRowHeight + 1)))
+    elseif reportView == "transactions" then
+        local rows = IRS:GetTransactionEvents(scopeKey)
+        transactionView.empty:SetShown(#rows == 0)
+
+        local rowWidth = math.max(
+            780,
+            (transactionView.scroll:GetWidth() or 800) - 4
+        )
+        local rowHeight = math.max(
+            30,
+            IRS:GetFontSize("main", "body") + 13
+        )
+
+        local timeW = math.max(116, math.floor(rowWidth * 0.17))
+        local characterW = math.max(130, math.floor(rowWidth * 0.22))
+        local changeW = math.max(105, math.floor(rowWidth * 0.17))
+        local effectW = math.max(105, math.floor(rowWidth * 0.17))
+        local kindW = math.max(
+            130,
+            rowWidth - timeW - characterW - changeW - effectW - 20
+        )
+
+        local x = 10
+        transactionView.header.time:ClearAllPoints()
+        transactionView.header.time:SetPoint("LEFT", x, 0)
+        transactionView.header.time:SetWidth(timeW)
+        x = x + timeW
+
+        transactionView.header.character:ClearAllPoints()
+        transactionView.header.character:SetPoint("LEFT", x, 0)
+        transactionView.header.character:SetWidth(characterW)
+        x = x + characterW
+
+        transactionView.header.change:ClearAllPoints()
+        transactionView.header.change:SetPoint("LEFT", x, 0)
+        transactionView.header.change:SetWidth(changeW - 8)
+        x = x + changeW
+
+        transactionView.header.effect:ClearAllPoints()
+        transactionView.header.effect:SetPoint("LEFT", x, 0)
+        transactionView.header.effect:SetWidth(effectW - 8)
+        x = x + effectW
+
+        transactionView.header.kind:ClearAllPoints()
+        transactionView.header.kind:SetPoint("LEFT", x + 8, 0)
+        transactionView.header.kind:SetWidth(kindW - 8)
+
+        for i, event in ipairs(rows) do
+            local row = EnsureTransactionRow(i)
+            row.transactionEvent = event
+            row:SetHeight(rowHeight)
+            row:ClearAllPoints()
+            row:SetPoint(
+                "TOPLEFT",
+                0,
+                -((i - 1) * (rowHeight + 1))
+            )
+            row:SetWidth(rowWidth)
+
+            local rx = 10
+            row.time:ClearAllPoints()
+            row.time:SetPoint("LEFT", rx, 0)
+            row.time:SetWidth(timeW)
+            row.time:SetText(
+                date("%b %d  %I:%M %p", event.at or time())
+            )
+            rx = rx + timeW
+
+            row.character:ClearAllPoints()
+            row.character:SetPoint("LEFT", rx, 0)
+            row.character:SetWidth(characterW)
+            row.character:SetText(event.characterLabel or "Unknown")
+            rx = rx + characterW
+
+            row.change:ClearAllPoints()
+            row.change:SetPoint("LEFT", rx, 0)
+            row.change:SetWidth(changeW - 8)
+            row.change:SetText(FormatGold(event.rawDelta or 0, true))
+            SetNetColor(row.change, event.rawDelta or 0, COLORS.text)
+            rx = rx + changeW
+
+            row.effect:ClearAllPoints()
+            row.effect:SetPoint("LEFT", rx, 0)
+            row.effect:SetWidth(effectW - 8)
+            row.effect:SetText(
+                FormatGold(event.ledgerAmount or 0, true)
+            )
+            SetNetColor(
+                row.effect,
+                event.ledgerAmount or 0,
+                COLORS.muted
+            )
+            rx = rx + effectW
+
+            row.kind:ClearAllPoints()
+            row.kind:SetPoint("LEFT", rx + 8, 0)
+            row.kind:SetWidth(kindW - 8)
+            row.kind:SetText(
+                IRS:GetTransactionDispositionLabel(event)
+            )
+
+            if event.disposition == "INTERNAL_TRANSFER" then
+                SetColor(row.kind, COLORS.cyan)
+            elseif (tonumber(event.ledgerAmount) or 0) > 0 then
+                SetColor(row.kind, COLORS.green)
+            elseif (tonumber(event.ledgerAmount) or 0) < 0 then
+                SetColor(row.kind, COLORS.red)
+            else
+                SetColor(row.kind, COLORS.muted)
+            end
+
+            row:Show()
+        end
+
+        for i = #rows + 1, #transactionView.rows do
+            transactionView.rows[i]:Hide()
+            transactionView.rows[i].transactionEvent = nil
+        end
+
+        transactionView.child:SetHeight(
+            math.max(1, #rows * (rowHeight + 1))
+        )
     elseif reportView == "metrics" then
         local m = IRS:GetReportMetrics(scopeKey)
         metricsView.cards[1].value:SetText(FormatGold(m.bestDayAmount or 0)); SetNetColor(metricsView.cards[1].value, m.bestDayAmount or 0)
@@ -2198,6 +2491,12 @@ function IRS:RefreshMainWindowSizeLayout()
 
     charScrollChild:SetWidth(math.max(820, (charScroll:GetWidth() or 840) - 18))
     historyChild:SetWidth(math.max(300, (historyScroll:GetWidth() or 800) - 18))
+    transactionView.child:SetWidth(
+        math.max(
+            300,
+            (transactionView.scroll:GetWidth() or 800) - 18
+        )
+    )
 
     if IRS.RefreshReservesLayout then
         IRS:RefreshReservesLayout()

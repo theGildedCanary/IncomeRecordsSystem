@@ -442,7 +442,7 @@ local MANUAL_SECTIONS = {
     },
     {
         "REPORTS",
-        "Reports can show All Characters or one character and can summarize Day, Week, Month, Best/Average, Total Recorded, and lifetime source breakdowns. IRS history begins when IRS starts tracking; Blizzard lifetime statistics may predate IRS and are shown separately so historical lifetime totals are not confused with the forward-looking IRS ledger."
+        "Reports can show All Characters or one character and can summarize Day, Week, Month, Best/Average, Total Recorded, lifetime source breakdowns, and a seven-day Transaction Log. The Transaction Log records each observed wallet change plus the final IRS effect and classification, including internal transfers and late transfer corrections, so unexpected profit changes can be audited. IRS history begins when IRS starts tracking; Blizzard lifetime statistics may predate IRS and are shown separately so historical lifetime totals are not confused with the forward-looking IRS ledger."
     },
     {
         "WOW TOKEN MARKET",

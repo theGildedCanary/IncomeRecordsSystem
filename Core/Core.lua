@@ -711,6 +711,15 @@ function IRS:EnsureDB()
         db.tracking.sources[statName] = db.tracking.sources[statName] or 0
     end
 
+    -- Seven-day wallet audit trail. Unlike the aggregate earnings buckets, this
+    -- records each observed wallet change and how IRS ultimately classified it.
+    db.transactions = db.transactions or {}
+    db.transactions.events = db.transactions.events or {}
+    db.transactions.nextId = math.max(
+        1,
+        math.floor(tonumber(db.transactions.nextId) or 1)
+    )
+
     db.migrations = db.migrations or {}
 
     if not db.migrations.localDailyBoundary132 then
@@ -870,6 +879,262 @@ function IRS:GetPeriodKeys()
     local weekKey = tostring(math.floor(weekStart))
 
     return dayKey, weekKey, monthKey
+end
+
+
+-- ============================================================================
+-- SEVEN-DAY TRANSACTION AUDIT LOG
+-- Keeps enough detail to explain how individual wallet changes affected IRS.
+-- ============================================================================
+local TRANSACTION_RETENTION_SECONDS = 7 * 24 * 60 * 60
+local TRANSACTION_MAX_EVENTS = 1000
+
+local function EnsureTransactionLog()
+    if not IRS.db then IRS:EnsureDB() end
+    IRS.db.transactions = IRS.db.transactions or {}
+    IRS.db.transactions.events = IRS.db.transactions.events or {}
+    IRS.db.transactions.nextId = math.max(
+        1,
+        math.floor(tonumber(IRS.db.transactions.nextId) or 1)
+    )
+    return IRS.db.transactions
+end
+
+function IRS:PruneTransactionLog()
+    local log = EnsureTransactionLog()
+    local cutoff = ServerNow() - TRANSACTION_RETENTION_SECONDS
+
+    for i = #log.events, 1, -1 do
+        local event = log.events[i]
+        if type(event) ~= "table"
+            or (tonumber(event.at) or 0) < cutoff then
+            table.remove(log.events, i)
+        end
+    end
+
+    while #log.events > TRANSACTION_MAX_EVENTS do
+        table.remove(log.events, 1)
+    end
+end
+
+local function FindTransactionEvent(id)
+    id = tonumber(id)
+    if not id then return nil end
+
+    local log = EnsureTransactionLog()
+    for i = #log.events, 1, -1 do
+        local event = log.events[i]
+        if tonumber(event.id) == id then
+            return event
+        end
+    end
+    return nil
+end
+
+function IRS:CreateTransactionEvent(data)
+    data = type(data) == "table" and data or {}
+    local log = EnsureTransactionLog()
+    IRS:PruneTransactionLog()
+
+    local id = log.nextId
+    log.nextId = id + 1
+
+    local now = ServerNow()
+    local characterKey = data.characterKey or IRS:CharacterKey()
+    local character = characterKey
+        and IRS.db.characters
+        and IRS.db.characters[characterKey]
+        or nil
+
+    local event = {
+        id = id,
+        at = now,
+        dayKey = date("%Y-%m-%d", now),
+        characterKey = characterKey,
+        characterLabel = data.characterLabel
+            or (character and (character.label or character.name))
+            or IRS:CharacterLabel(),
+        walletBefore = math.floor(tonumber(data.walletBefore) or 0),
+        walletAfter = math.floor(tonumber(data.walletAfter) or 0),
+        rawDelta = math.floor(tonumber(data.rawDelta) or 0),
+        ledgerAmount = math.floor(tonumber(data.ledgerAmount) or 0),
+        internalAmount = math.max(
+            0,
+            math.floor(tonumber(data.internalAmount) or 0)
+        ),
+        disposition = data.disposition or "PENDING",
+        reason = data.reason or "PLAYER_MONEY",
+        fromType = data.fromType,
+        fromKey = data.fromKey,
+        toType = data.toType,
+        toKey = data.toKey,
+        corrected = data.corrected == true,
+        updatedAt = now,
+    }
+
+    table.insert(log.events, event)
+    IRS:PruneTransactionLog()
+    return id
+end
+
+function IRS:UpdateTransactionEvent(id, fields)
+    local event = FindTransactionEvent(id)
+    if not event or type(fields) ~= "table" then return false end
+
+    for key, value in pairs(fields) do
+        event[key] = value
+    end
+    event.updatedAt = ServerNow()
+    return true
+end
+
+function IRS:RecordTransactionLedgerEffect(id, amount, reason)
+    local event = FindTransactionEvent(id)
+    if not event then return false end
+
+    amount = math.floor(tonumber(amount) or 0)
+    event.ledgerAmount = math.floor(
+        (tonumber(event.ledgerAmount) or 0) + amount
+    )
+
+    if reason then event.reason = reason end
+    event.updatedAt = ServerNow()
+
+    if event.ledgerAmount > 0 then
+        event.disposition = (tonumber(event.internalAmount) or 0) > 0
+            and "PARTIAL_INCOME"
+            or "INCOME"
+    elseif event.ledgerAmount < 0 then
+        event.disposition = (tonumber(event.internalAmount) or 0) > 0
+            and "PARTIAL_EXPENSE"
+            or "EXPENSE"
+    elseif (tonumber(event.internalAmount) or 0) > 0 then
+        event.disposition = "INTERNAL_TRANSFER"
+    else
+        event.disposition = "PENDING"
+    end
+
+    return true
+end
+
+function IRS:RecordTransactionInternalMatch(
+    id,
+    matched,
+    walletAmount,
+    storageType,
+    storageKey,
+    reason
+)
+    local event = FindTransactionEvent(id)
+    if not event then return false end
+
+    matched = math.max(0, math.floor(tonumber(matched) or 0))
+    if matched <= 0 then return false end
+
+    event.internalAmount =
+        math.max(0, tonumber(event.internalAmount) or 0) + matched
+
+    if walletAmount < 0 then
+        event.fromType = "character"
+        event.fromKey = event.characterKey
+        event.toType = storageType
+        event.toKey = storageKey
+    else
+        event.fromType = storageType
+        event.fromKey = storageKey
+        event.toType = "character"
+        event.toKey = event.characterKey
+    end
+
+    if reason then event.reason = reason end
+    event.updatedAt = ServerNow()
+
+    if (tonumber(event.ledgerAmount) or 0) == 0 then
+        event.disposition = "INTERNAL_TRANSFER"
+    end
+
+    return true
+end
+
+function IRS:GetTransactionDispositionLabel(event)
+    local disposition = type(event) == "table"
+        and tostring(event.disposition or "")
+        or tostring(event or "")
+
+    local labels = {
+        PENDING = "Pending",
+        INCOME = "Income",
+        EXPENSE = "Expense",
+        INTERNAL_TRANSFER = "Internal Transfer",
+        PARTIAL_INCOME = "Income + Transfer",
+        PARTIAL_EXPENSE = "Expense + Transfer",
+        IGNORED = "Ignored",
+    }
+
+    return labels[disposition] or disposition
+end
+
+function IRS:GetTransactionEvents(characterKey)
+    IRS:PruneTransactionLog()
+    local log = EnsureTransactionLog()
+    local rows = {}
+
+    for i = #log.events, 1, -1 do
+        local event = log.events[i]
+        if characterKey == nil or event.characterKey == characterKey then
+            rows[#rows + 1] = event
+        end
+    end
+
+    return rows
+end
+
+function IRS:GetTransactionSummary(dayKey, characterKey)
+    IRS:PruneTransactionLog()
+    dayKey = dayKey or select(1, IRS:GetPeriodKeys())
+
+    local summary = {
+        count = 0,
+        ledgerNet = 0,
+        income = 0,
+        expense = 0,
+        internal = 0,
+        pending = 0,
+        last = nil,
+    }
+
+    for _, event in ipairs(EnsureTransactionLog().events) do
+        if event.dayKey == dayKey
+            and (characterKey == nil or event.characterKey == characterKey) then
+            summary.count = summary.count + 1
+
+            local ledger = math.floor(tonumber(event.ledgerAmount) or 0)
+            local internal = math.max(
+                0,
+                math.floor(tonumber(event.internalAmount) or 0)
+            )
+
+            summary.ledgerNet = summary.ledgerNet + ledger
+            if ledger > 0 then
+                summary.income = summary.income + ledger
+            elseif ledger < 0 then
+                summary.expense = summary.expense + math.abs(ledger)
+            end
+
+            summary.internal = summary.internal + internal
+            if event.disposition == "PENDING" then
+                summary.pending = summary.pending + 1
+            end
+
+            if not summary.last
+                or (tonumber(event.at) or 0)
+                    > (tonumber(summary.last.at) or 0) then
+                summary.last = event
+            end
+        end
+    end
+
+    return summary
 end
 
 -- CENTRAL LEDGER WRITER.
@@ -1178,6 +1443,16 @@ function IRS:HandleMoneyChange()
     end
 
     if delta ~= 0 then
+        local transactionId = IRS:CreateTransactionEvent({
+            characterKey = key,
+            characterLabel = record.label or record.name,
+            walletBefore = previousMoney,
+            walletAfter = currentMoney,
+            rawDelta = delta,
+            disposition = "PENDING",
+            reason = "PLAYER_MONEY",
+        })
+
         -- Internal storage movements are NOT profit/loss. The transfer module
         -- matches wallet changes against Warband Bank and user-owned Guild Bank
         -- balance changes, including either event order. A short defer is used
@@ -1191,21 +1466,51 @@ function IRS:HandleMoneyChange()
                 delta,
                 key,
                 previousWarband,
-                currentWarband
+                currentWarband,
+                transactionId
             )
         elseif previousWarband and currentWarband then
             -- Compatibility fallback if the transfer module is unavailable.
             if delta > 0 and currentWarband < previousWarband then
                 local transfer = math.min(delta, previousWarband - currentWarband)
                 netChange = delta - transfer
+                IRS:RecordTransactionInternalMatch(
+                    transactionId,
+                    transfer,
+                    delta,
+                    "warband",
+                    nil,
+                    "WARBAND_DIRECT_MATCH"
+                )
             elseif delta < 0 and currentWarband > previousWarband then
                 local transfer = math.min(-delta, currentWarband - previousWarband)
                 netChange = delta + transfer
+                IRS:RecordTransactionInternalMatch(
+                    transactionId,
+                    transfer,
+                    delta,
+                    "warband",
+                    nil,
+                    "WARBAND_DIRECT_MATCH"
+                )
             end
         end
 
         if netChange ~= 0 and not deferred then
             IRS:RecordEarnings(netChange, {}, key)
+            IRS:RecordTransactionLedgerEffect(
+                transactionId,
+                netChange,
+                "RECORDED_WALLET_CHANGE"
+            )
+        elseif netChange == 0 and not deferred then
+            local event = FindTransactionEvent(transactionId)
+            if event and (tonumber(event.internalAmount) or 0) == 0 then
+                IRS:UpdateTransactionEvent(transactionId, {
+                    disposition = "IGNORED",
+                    reason = "NO_LEDGER_EFFECT",
+                })
+            end
         end
     end
 
@@ -3728,6 +4033,45 @@ SlashCmdList.INCOMERECORDSSYSTEM = function(msg)
             IRS:FormatMoney(IRS:GetCurrentEarnings().today or 0, true),
             IRS:FormatMoney(stats.totalAcquired or 0, true),
             IRS:FormatMoney(sourceTracked, true)))
+
+        local tx = IRS:GetTransactionSummary(debugDayKey)
+        print(string.format(
+            "|cff46d9ffIRS transactions:|r %d event%s • income %s • expense %s • internal %s • net %s • pending %d",
+            tx.count or 0,
+            (tx.count or 0) == 1 and "" or "s",
+            IRS:FormatMoney(tx.income or 0, true),
+            IRS:FormatMoney(tx.expense or 0, true),
+            IRS:FormatMoney(tx.internal or 0, true),
+            IRS:FormatMoney(tx.ledgerNet or 0, true),
+            tx.pending or 0
+        ))
+        if tx.last then
+            print(string.format(
+                "|cff46d9ffIRS last transaction:|r %s • %s • raw %s • IRS effect %s",
+                date("%b %d %I:%M:%S %p", tx.last.at or ServerNow()),
+                IRS:GetTransactionDispositionLabel(tx.last),
+                IRS:FormatMoney(tx.last.rawDelta or 0, true),
+                IRS:FormatMoney(tx.last.ledgerAmount or 0, true)
+            ))
+        end
+    elseif msg == "transactions" or msg == "tx" then
+        local rows = IRS:GetTransactionEvents()
+        print("|cff46d9ffIRS — recent transaction log (up to 20):|r")
+        if #rows == 0 then
+            print("  No wallet transactions have been recorded yet.")
+        else
+            for i = 1, math.min(20, #rows) do
+                local event = rows[i]
+                print(string.format(
+                    "  %s • %s • raw %s • IRS %s • %s",
+                    date("%b %d %I:%M:%S %p", event.at or ServerNow()),
+                    event.characterLabel or "Unknown",
+                    IRS:FormatMoney(event.rawDelta or 0, true),
+                    IRS:FormatMoney(event.ledgerAmount or 0, true),
+                    IRS:GetTransactionDispositionLabel(event)
+                ))
+            end
+        end
     elseif msg == "status" then
         local e = IRS:GetCurrentEarnings()
         print(string.format("|cff46d9ffIRS:|r today %s • week %s • month %s • tracked total %s",

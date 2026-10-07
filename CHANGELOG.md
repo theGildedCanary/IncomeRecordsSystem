@@ -8,6 +8,9 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 
 ### Added
 
+- Added a seven-day Transaction Log that records each observed wallet change, its IRS ledger effect, transfer classification, and diagnostic reason.
+- Added `/irs transactions` and expanded `/irs debug` with transaction-audit summaries.
+
 ### Changed
 
 ### Fixed

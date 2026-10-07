@@ -194,7 +194,14 @@ local function PruneRuntime()
     end
 end
 
-local function RecordMatched(walletAmount, matched, characterKey, storage)
+local function RecordMatched(
+    walletAmount,
+    matched,
+    characterKey,
+    storage,
+    transactionId,
+    reason
+)
     if matched <= 0 then return end
 
     if walletAmount < 0 then
@@ -214,9 +221,20 @@ local function RecordMatched(walletAmount, matched, characterKey, storage)
             characterKey
         )
     end
+
+    if IRS.RecordTransactionInternalMatch then
+        IRS:RecordTransactionInternalMatch(
+            transactionId,
+            matched,
+            walletAmount,
+            storage.storageType,
+            storage.storageKey,
+            reason or "INTERNAL_STORAGE_MATCH"
+        )
+    end
 end
 
-local function ConsumeStorage(walletAmount, characterKey)
+local function ConsumeStorage(walletAmount, characterKey, transactionId)
     walletAmount = math.floor(tonumber(walletAmount) or 0)
     if walletAmount == 0 then return 0 end
 
@@ -237,7 +255,14 @@ local function ConsumeStorage(walletAmount, characterKey)
                 math.abs(storageAmount)
             )
 
-            RecordMatched(remaining, matched, characterKey, storage)
+            RecordMatched(
+                remaining,
+                matched,
+                characterKey,
+                storage,
+                transactionId,
+                "STORAGE_MATCH"
+            )
 
             if remaining < 0 then
                 remaining = remaining + matched
@@ -289,7 +314,27 @@ local function ConsumeLateRecordedStorage(storage)
             -- matched transfer amount before logging it as internal movement.
             local correction = walletAmount < 0 and matched or -matched
             IRS:RecordEarnings(correction, {}, wallet.characterKey)
-            RecordMatched(walletAmount, matched, wallet.characterKey, storage)
+            if IRS.RecordTransactionLedgerEffect then
+                IRS:RecordTransactionLedgerEffect(
+                    wallet.transactionId,
+                    correction,
+                    "GUILD_LATE_MATCH"
+                )
+            end
+            RecordMatched(
+                walletAmount,
+                matched,
+                wallet.characterKey,
+                storage,
+                wallet.transactionId,
+                "GUILD_LATE_MATCH"
+            )
+            if IRS.UpdateTransactionEvent then
+                IRS:UpdateTransactionEvent(
+                    wallet.transactionId,
+                    { corrected = true }
+                )
+            end
 
             if walletAmount < 0 then
                 wallet.amount = walletAmount + matched
@@ -334,9 +379,20 @@ function IRS:FinalizePendingInternalWallet(walletId)
     if not entry then return end
     table.remove(runtime.pendingWallet, index)
 
-    local remaining = ConsumeStorage(entry.amount, entry.characterKey)
+    local remaining = ConsumeStorage(
+        entry.amount,
+        entry.characterKey,
+        entry.transactionId
+    )
     if remaining ~= 0 then
         IRS:RecordEarnings(remaining, {}, entry.characterKey)
+        if IRS.RecordTransactionLedgerEffect then
+            IRS:RecordTransactionLedgerEffect(
+                entry.transactionId,
+                remaining,
+                "GUILD_MATCH_TIMEOUT"
+            )
+        end
 
         -- Do not forget this immediately. The owned Guild Bank money event can
         -- arrive after MATCH_WINDOW on some clients. A matching late event will
@@ -346,6 +402,7 @@ function IRS:FinalizePendingInternalWallet(walletId)
             characterKey = entry.characterKey,
             expectedStorageType = entry.expectedStorageType,
             expectedStorageKey = entry.expectedStorageKey,
+            transactionId = entry.transactionId,
             recordedAt = Now(),
         })
     end
@@ -354,7 +411,12 @@ function IRS:FinalizePendingInternalWallet(walletId)
     if IRS.RefreshUI then IRS:RefreshUI() end
 end
 
-local function QueueWallet(walletAmount, characterKey, guildKey)
+local function QueueWallet(
+    walletAmount,
+    characterKey,
+    guildKey,
+    transactionId
+)
     runtime.nextWalletId = (tonumber(runtime.nextWalletId) or 0) + 1
     local id = runtime.nextWalletId
 
@@ -364,8 +426,20 @@ local function QueueWallet(walletAmount, characterKey, guildKey)
         characterKey = characterKey,
         expectedStorageType = "guild",
         expectedStorageKey = guildKey,
+        transactionId = transactionId,
         at = Now(),
     })
+
+    if IRS.UpdateTransactionEvent then
+        IRS:UpdateTransactionEvent(transactionId, {
+            disposition = "PENDING",
+            reason = "GUILD_PENDING",
+            fromType = walletAmount < 0 and "character" or "guild",
+            fromKey = walletAmount < 0 and characterKey or guildKey,
+            toType = walletAmount < 0 and "guild" or "character",
+            toKey = walletAmount < 0 and guildKey or characterKey,
+        })
+    end
 
     C_Timer.After(MATCH_WINDOW, function()
         if IRS.db then
@@ -416,7 +490,9 @@ function IRS:ObserveInternalStorageDelta(storageType, storageKey, amount)
                 walletAmount,
                 matched,
                 wallet.characterKey,
-                storage
+                storage,
+                wallet.transactionId,
+                "GUILD_EVENT_MATCH"
             )
 
             if walletAmount < 0 then
@@ -452,7 +528,8 @@ function IRS:FilterInternalWalletChange(
     walletDelta,
     characterKey,
     previousWarband,
-    currentWarband
+    currentWarband,
+    transactionId
 )
     walletDelta = math.floor(tonumber(walletDelta) or 0)
     if walletDelta == 0 then return 0, false end
@@ -481,7 +558,9 @@ function IRS:FilterInternalWalletChange(
                 {
                     storageType = "warband",
                     storageKey = nil,
-                }
+                },
+                transactionId,
+                "WARBAND_DIRECT_MATCH"
             )
 
             if remaining < 0 then
@@ -493,13 +572,22 @@ function IRS:FilterInternalWalletChange(
     end
 
     -- If a bank event arrived first, consume its pending balance change now.
-    remaining = ConsumeStorage(remaining, characterKey)
+    remaining = ConsumeStorage(
+        remaining,
+        characterKey,
+        transactionId
+    )
 
     -- Guild Bank money often updates a fraction after PLAYER_MONEY. Defer the
     -- unmatched wallet change only while an OWNED Guild Bank is actually open.
     local openGuildKey = remaining ~= 0 and CurrentInternalGuildOpen() or nil
     if remaining ~= 0 and openGuildKey then
-        QueueWallet(remaining, characterKey, openGuildKey)
+        QueueWallet(
+            remaining,
+            characterKey,
+            openGuildKey,
+            transactionId
+        )
         return 0, true
     end
 
