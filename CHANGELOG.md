@@ -13,7 +13,11 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 
 ### Changed
 
+- Profit Distribution now allocates net profit across active Savings Projects only; Reserve Funds no longer dilute Project distribution percentages.
+
 ### Fixed
+
+- Fixed Savings Project distribution percentages being normalized together with Reserve Fund percentages, which could make shared Guild Bank Project splits appear not to tally correctly.
 
 ### Removed
 

@@ -36,6 +36,15 @@ local function EnsureToolsDB()
     IRS.db.tools.distribution = IRS.db.tools.distribution or {}
     IRS.db.tools.distribution.history = IRS.db.tools.distribution.history or {}
     IRS.db.tools.distribution.weights = IRS.db.tools.distribution.weights or {}
+
+    -- Profit Distribution is for Savings Projects only. Reserve Funds maintain
+    -- standing balances and should not compete with project savings percentages.
+    for goalId in pairs(IRS.db.tools.distribution.weights) do
+        if tostring(goalId):match("^reserve:") then
+            IRS.db.tools.distribution.weights[goalId] = nil
+        end
+    end
+
     IRS.db.ui = IRS.db.ui or {}
     IRS.db.ui.toolsSection = IRS.db.ui.toolsSection or "manual"
 
@@ -86,32 +95,6 @@ function IRS:GetProfitDistributionGoals()
                 else
                     completed = completed + 1
                 end
-            end
-        end
-    end
-
-    if IRS.GetSortedReserves then
-        for _, entry in ipairs(IRS:GetSortedReserves()) do
-            local reserve = entry.reserve
-            local stats = reserve and IRS:GetReserveStats(reserve) or nil
-            if not stats or not stats.available then
-                unavailable = unavailable + 1
-            elseif (tonumber(stats.refill) or 0) > 0 then
-                local goalId = "reserve:" .. tostring(entry.id)
-                local defaultWeight = math.max(0, tonumber(reserve.allocationPercent) or 0)
-                local savedWeight = state.weights[goalId]
-                table.insert(rows, {
-                    id = goalId,
-                    objectId = entry.id,
-                    kind = "RESERVE",
-                    name = reserve.name or "Reserve Fund",
-                    weight = savedWeight ~= nil and math.max(0, tonumber(savedWeight) or 0) or defaultWeight,
-                    defaultWeight = defaultWeight,
-                    need = math.max(0, math.floor(tonumber(stats.refill) or 0)),
-                    sourceLabel = stats.sourceLabel or "Unknown Source",
-                })
-            else
-                completed = completed + 1
             end
         end
     end
@@ -376,7 +359,7 @@ title:SetText("TOOLS")
 
 local subtitle = MakeText(page, "body", COLORS.muted, "LEFT")
 subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -3)
-subtitle:SetText("Reference IRS systems or calculate how unallocated net profit should be divided among active goals.")
+subtitle:SetText("Reference IRS systems or calculate how unallocated net profit should be divided among active Savings Projects.")
 
 local manualTab = MakeButton(page, "USER'S MANUAL", 4, -55, 150)
 local distributionTab = MakeButton(page, "PROFIT DISTRIBUTION", 164, -55, 180)
@@ -434,7 +417,7 @@ local MANUAL_SECTIONS = {
     },
     {
         "PROFIT DISTRIBUTION CALCULATOR",
-        "The calculator uses IRS net profit accumulated since the last manual allocation checkpoint. Each eligible goal has an editable Distribution % used only by this calculator; new goals initially inherit their Project or Reserve Allocation %, but changing the calculator value does not rewrite the goal. IRS normalizes those Distribution % values as a whole, then suggests how much of the available profit goes to each. Suggestions are capped at each goal's remaining need; excess stays Unallocated. After physically moving the suggested gold, press MARK ALLOCATED. IRS records the current Total Recorded value as the new checkpoint and immediately begins accumulating only later net profit. Internal transfers do not change the profit pool."
+        "The calculator uses IRS net profit accumulated since the last manual allocation checkpoint and distributes it across active Savings Projects only. Each Project has an editable Distribution % used only by this calculator; new Projects initially inherit their Project Allocation %, but changing the calculator value does not rewrite the Project. IRS normalizes those Distribution % values across the eligible Savings Projects, then suggests how much of the available profit goes to each. Suggestions are capped at each Project's remaining need; excess stays Unallocated. Reserve Funds are intentionally excluded because they maintain standing balances rather than competing for project savings. After physically moving the suggested gold, press MARK ALLOCATED. IRS records the current Total Recorded value as the new checkpoint and immediately begins accumulating only later net profit. Internal transfers do not change the profit pool."
     },
     {
         "CHARACTERS",
@@ -511,7 +494,7 @@ local distNote = MakeText(distributionView, "helper", COLORS.muted, "LEFT")
 distNote:SetPoint("TOPLEFT", distHeading, "BOTTOMLEFT", 0, -4)
 distNote:SetPoint("TOPRIGHT", -4, 0)
 distNote:SetWordWrap(true)
-distNote:SetText("Splits positive IRS NET profit since the last allocation checkpoint. Edit Distribution % here without changing the Project/Reserve itself; eligible values are normalized as a whole.")
+distNote:SetText("Splits positive IRS NET profit since the last allocation checkpoint across active Savings Projects only. Edit Distribution % here without changing the Project itself; eligible values are normalized as a whole.")
 
 local summary = MakePanel(distributionView, COLORS.panel)
 summary:SetPoint("TOPLEFT", 0, -64)
@@ -799,7 +782,7 @@ function IRS:RefreshToolsPage()
         WholeGold(data.distributed), WholeGold(data.remainder)
     ))
     footerHint:SetText(string.format(
-        "Distribution weights total %.1f%% and are normalized across eligible goals. %d funded/completed goal%s excluded; %d unavailable source%s excluded. A negative net since the checkpoint produces 0g available until the loss is recovered or a new allocation checkpoint is recorded.",
+        "Distribution weights total %.1f%% and are normalized across eligible Savings Projects. %d completed Project%s excluded; %d unavailable source%s excluded. A negative net since the checkpoint produces 0g available until the loss is recovered or a new allocation checkpoint is recorded.",
         data.totalWeight or 0,
         data.completedExcluded or 0, (data.completedExcluded or 0) == 1 and "" or "s",
         data.unavailableExcluded or 0, (data.unavailableExcluded or 0) == 1 and "" or "s"
