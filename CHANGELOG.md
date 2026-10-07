@@ -16,6 +16,7 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 - Savings Projects now use separate Project Management and Allocation tabs.
 - Profit Distribution moved from Tools into Savings Projects > Allocation.
 - Each Savings Project now has its own linked Distribution % slider; changing one slider automatically redistributes the remaining percentage across the other Projects so Project Distribution always totals 100%.
+- Project Distribution sliders now use whole-number percentages only; Split % can still display decimals after the Reserve carve-out.
 - Added a manual Reserve % carve-out. Reserve % is removed from total profit first, and each Project's read-only Split % shows its effective share of the total after reserves.
 - Project Management no longer exposes a per-project Allocation % field; the calculated Split % is used internally for shared-source Project accounting.
 

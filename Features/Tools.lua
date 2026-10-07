@@ -35,6 +35,11 @@ local function RoundPercent(value)
     return math.floor((value * 10) + 0.5) / 10
 end
 
+local function RoundDistribution(value)
+    value = math.max(0, math.min(100, tonumber(value) or 0))
+    return math.floor(value + 0.5)
+end
+
 local function GetAllocationProjects()
     local rows = {}
     if not IRS.GetSortedProjects then return rows end
@@ -98,8 +103,53 @@ local function NormalizeProjectWeights(state, changedProjectId, changedValue)
     end
 
     local changedId = changedProjectId and tostring(changedProjectId) or nil
+    local function NormalizeWholeDistribution(rawValues, distributionEntries, targetTotal)
+        local result = {}
+        targetTotal = math.max(0, math.floor((tonumber(targetTotal) or 0) + 0.5))
+        if #distributionEntries == 0 then return result end
+
+        local rawTotal = 0
+        for _, entry in ipairs(distributionEntries) do
+            rawTotal = rawTotal + math.max(0, tonumber(rawValues[entry.id]) or 0)
+        end
+        if rawTotal <= 0 then
+            for _, entry in ipairs(distributionEntries) do rawValues[entry.id] = 1 end
+            rawTotal = #distributionEntries
+        end
+
+        local remainders = {}
+        local used = 0
+        for _, entry in ipairs(distributionEntries) do
+            local exact = targetTotal * (math.max(0, tonumber(rawValues[entry.id]) or 0) / rawTotal)
+            local whole = math.floor(exact)
+            result[entry.id] = whole
+            used = used + whole
+            remainders[#remainders + 1] = {
+                id = entry.id,
+                remainder = exact - whole,
+            }
+        end
+
+        table.sort(remainders, function(a, b)
+            if a.remainder == b.remainder then return tostring(a.id) < tostring(b.id) end
+            return a.remainder > b.remainder
+        end)
+
+        local remaining = targetTotal - used
+        local index = 1
+        while remaining > 0 and #remainders > 0 do
+            local item = remainders[index]
+            result[item.id] = (result[item.id] or 0) + 1
+            remaining = remaining - 1
+            index = index + 1
+            if index > #remainders then index = 1 end
+        end
+
+        return result
+    end
+
     if changedId and valid[changedId] then
-        local newValue = RoundPercent(changedValue)
+        local newValue = RoundDistribution(changedValue)
         state.projectWeights[changedId] = newValue
 
         local others, raw = {}, {}
@@ -109,7 +159,7 @@ local function NormalizeProjectWeights(state, changedProjectId, changedValue)
                 raw[entry.id] = math.max(0, tonumber(state.projectWeights[entry.id]) or 0)
             end
         end
-        local redistributed = NormalizeValues(raw, others, 100 - newValue)
+        local redistributed = NormalizeWholeDistribution(raw, others, 100 - newValue)
         for id, value in pairs(redistributed) do state.projectWeights[id] = value end
         return entries
     end
@@ -118,7 +168,7 @@ local function NormalizeProjectWeights(state, changedProjectId, changedValue)
     for _, entry in ipairs(entries) do
         raw[entry.id] = math.max(0, tonumber(state.projectWeights[entry.id]) or 0)
     end
-    local normalized = NormalizeValues(raw, entries, 100)
+    local normalized = NormalizeWholeDistribution(raw, entries, 100)
     for id, value in pairs(normalized) do state.projectWeights[id] = value end
     return entries
 end
@@ -240,7 +290,7 @@ function IRS:GetProfitDistributionGoals()
             objectId = entry.objectId,
             kind = "PROJECT",
             name = project.name or "Savings Project",
-            weight = RoundPercent(state.projectWeights[entry.id] or 0),
+            weight = RoundDistribution(state.projectWeights[entry.id] or 0),
             splitPercent = RoundPercent(splits[entry.id] or 0),
             need = need,
             available = available,
@@ -428,7 +478,7 @@ local MANUAL_SECTIONS = {
     },
     {
         "SAVINGS PROJECTS",
-        "Savings Projects now have two tabs. Project Management stores the goal itself: name, target, Start Date, Deadline, funding source, checkpoints, progress, and history. Allocation is account-wide planning: every Project has a linked Distribution % slider and the Project sliders always total 100%. Project Management no longer has an editable Allocation % field. The calculated Split % from the Allocation tab is what IRS uses when attributing a shared source balance to each Project."
+        "Savings Projects now have two tabs. Project Management stores the goal itself: name, target, Start Date, Deadline, funding source, checkpoints, progress, and history. Allocation is account-wide planning: every Project has a linked whole-number Distribution % slider and the Project sliders always total 100%. Project Management no longer has an editable Allocation % field. The calculated Split % from the Allocation tab is what IRS uses when attributing a shared source balance to each Project."
     },
     {
         "PROJECT HISTORY & CHECKPOINTS",
@@ -513,7 +563,7 @@ local distNote = MakeText(distributionView, "helper", COLORS.muted, "LEFT")
 distNote:SetPoint("TOPLEFT", distHeading, "BOTTOMLEFT", 0, -4)
 distNote:SetPoint("TOPRIGHT", -4, 0)
 distNote:SetWordWrap(true)
-distNote:SetText("Each Project has its own linked Distribution slider. Project Distribution always totals 100%. Reserve % is removed from total profit first; Split % is each Project's effective share after that reserve carve-out.")
+distNote:SetText("Each Project has its own linked whole-number Distribution slider. Project Distribution always totals 100%. Reserve % is removed from total profit first; Split % is each Project's effective share after that reserve carve-out.")
 
 local summary = MakePanel(distributionView, COLORS.panel)
 summary:SetPoint("TOPLEFT", 0, -58)
@@ -575,7 +625,7 @@ local function EnsureDistRow(index)
     local sliderName = "IncomeRecordsSystemProjectDistributionSlider" .. tostring(index)
     row.slider = CreateFrame("Slider", sliderName, row, "OptionsSliderTemplate")
     row.slider:SetMinMaxValues(0,100)
-    row.slider:SetValueStep(0.1)
+    row.slider:SetValueStep(1)
     if row.slider.SetObeyStepOnDrag then row.slider:SetObeyStepOnDrag(true) end
     local low=_G[sliderName.."Low"]; if low then low:SetText("") end
     local high=_G[sliderName.."High"]; if high then high:SetText("") end
@@ -587,8 +637,9 @@ local function EnsureDistRow(index)
     row.need = MakeText(row, "body", COLORS.muted, "RIGHT")
 
     row.slider:SetScript("OnValueChanged", function(self, value)
-        row.sliderValue:SetText(PercentText(value))
-        if not row._refreshing then row._pendingWeight=value end
+        local wholeValue = RoundDistribution(value)
+        row.sliderValue:SetText(string.format("%d%%", wholeValue))
+        if not row._refreshing then row._pendingWeight=wholeValue end
     end)
     row.slider:SetScript("OnMouseUp", function()
         if not row.data or row._refreshing then return end
@@ -771,7 +822,7 @@ function IRS:RefreshProjectAllocationPage()
         row.destination:SetText(item.sourceLabel or "Unknown source")
         row._refreshing=true
         row.slider:SetValue(item.weight or 0)
-        row.sliderValue:SetText(PercentText(item.weight or 0))
+        row.sliderValue:SetText(string.format("%d%%", RoundDistribution(item.weight or 0)))
         row._refreshing=false
         row._pendingWeight=nil
         row.slider:SetEnabled(#data.rows>1)
