@@ -345,7 +345,7 @@ miniClose:SetPoint("TOPRIGHT", -3, -3)
 local miniTokenAlert = MakePanel(miniDashboard, COLORS.softFill)
 miniTokenAlert:SetPoint("TOPLEFT", miniHeader, "BOTTOMLEFT", 2, -6)
 miniTokenAlert:SetPoint("TOPRIGHT", miniHeader, "BOTTOMRIGHT", -2, -6)
-miniTokenAlert:SetHeight(64)
+miniTokenAlert:SetHeight(48)
 miniTokenAlert:Hide()
 
 miniTokenAlert.title = MakeText(
@@ -358,23 +358,14 @@ miniTokenAlert.title = MakeText(
 miniTokenAlert.title:SetPoint("TOPLEFT", 9, -7)
 miniTokenAlert.title:SetPoint("TOPRIGHT", -9, -7)
 
-miniTokenAlert.action = MakeText(
-    miniTokenAlert,
-    "body",
-    COLORS.goldSoft,
-    "RIGHT"
-)
-miniTokenAlert.action:SetPoint("TOPLEFT", 9, -27)
-miniTokenAlert.action:SetPoint("TOPRIGHT", -9, -27)
-
 miniTokenAlert.detail = MakeText(
     miniTokenAlert,
     "helper",
     COLORS.muted,
     "LEFT"
 )
-miniTokenAlert.detail:SetPoint("TOPLEFT", 9, -45)
-miniTokenAlert.detail:SetPoint("TOPRIGHT", -9, -45)
+miniTokenAlert.detail:SetPoint("TOPLEFT", 9, -27)
+miniTokenAlert.detail:SetPoint("TOPRIGHT", -9, -27)
 
 local miniTokenPreviewSummary
 local miniTokenPreviewGeneration = 0
@@ -415,12 +406,10 @@ local function UpdateMiniTokenAlert(summary)
     local isBuy = summary.status == "GOOD BUY"
         or summary.status == "EXTREME BUY"
     local color = isBuy and COLORS.green or COLORS.gold
-    local action = isBuy and "BUY WITH GOLD" or "SELL FOR GOLD"
 
     miniTokenAlert.title:SetText(
         "WOW TOKEN — " .. tostring(summary.status)
     )
-    miniTokenAlert.action:SetText(action)
     local detailPrefix = isPreview and "TEST PREVIEW  •  " or ""
     miniTokenAlert.detail:SetText(
         detailPrefix
@@ -433,7 +422,6 @@ local function UpdateMiniTokenAlert(summary)
     )
 
     SetColor(miniTokenAlert.title, color)
-    SetColor(miniTokenAlert.action, color)
 
     if isBuy then
         miniTokenAlert:SetBackdropColor(0.10, 0.16, 0.09, 0.88)
@@ -931,8 +919,8 @@ function IRS:RefreshMiniDashboard()
     local tokenAlertHeight = 0
     if showTokenAlert then
         tokenAlertHeight = math.max(
-            64,
-            heading2Size + bodySize + helperSize + 30
+            48,
+            heading2Size + helperSize + 25
         )
 
         miniTokenAlert:ClearAllPoints()
@@ -944,28 +932,16 @@ function IRS:RefreshMiniDashboard()
         miniTokenAlert.title:SetPoint("TOPLEFT", 9, -7)
         miniTokenAlert.title:SetPoint("TOPRIGHT", -9, -7)
 
-        miniTokenAlert.action:ClearAllPoints()
-        miniTokenAlert.action:SetPoint(
-            "TOPLEFT",
-            9,
-            -(heading2Size + 13)
-        )
-        miniTokenAlert.action:SetPoint(
-            "TOPRIGHT",
-            -9,
-            -(heading2Size + 13)
-        )
-
         miniTokenAlert.detail:ClearAllPoints()
         miniTokenAlert.detail:SetPoint(
             "TOPLEFT",
             9,
-            -(heading2Size + bodySize + 20)
+            -(heading2Size + 14)
         )
         miniTokenAlert.detail:SetPoint(
             "TOPRIGHT",
             -9,
-            -(heading2Size + bodySize + 20)
+            -(heading2Size + 14)
         )
     end
 

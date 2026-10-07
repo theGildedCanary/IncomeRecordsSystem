@@ -279,7 +279,7 @@ end
 
 -- Dedicated visual Token alert shown when the Mini Dashboard is not open.
 local tokenSplash = MakePanel(UIParent, COLORS.panelAlt)
-tokenSplash:SetSize(460, 116)
+tokenSplash:SetSize(460, 94)
 tokenSplash:SetPoint("TOP", UIParent, "TOP", 0, -165)
 tokenSplash:SetFrameStrata("DIALOG")
 tokenSplash:SetClampedToScreen(true)
@@ -295,23 +295,14 @@ tokenSplash.title = MakeText(
 tokenSplash.title:SetPoint("TOPLEFT", 20, -16)
 tokenSplash.title:SetPoint("TOPRIGHT", -20, -16)
 
-tokenSplash.action = MakeText(
-    tokenSplash,
-    "label",
-    COLORS.text,
-    "CENTER"
-)
-tokenSplash.action:SetPoint("TOPLEFT", 20, -48)
-tokenSplash.action:SetPoint("TOPRIGHT", -20, -48)
-
 tokenSplash.detail = MakeText(
     tokenSplash,
     "helper",
     COLORS.muted,
     "CENTER"
 )
-tokenSplash.detail:SetPoint("TOPLEFT", 20, -76)
-tokenSplash.detail:SetPoint("TOPRIGHT", -20, -76)
+tokenSplash.detail:SetPoint("TOPLEFT", 20, -52)
+tokenSplash.detail:SetPoint("TOPRIGHT", -20, -52)
 
 local tokenSplashClose = CreateFrame(
     "Button",
@@ -338,18 +329,12 @@ local function ShowTokenSplash(summary)
 
     local market = IRS:EnsureTokenMarketDB()
     local settings = market.settings
-    local isBuy = summary.status == "GOOD BUY"
-        or summary.status == "EXTREME BUY"
-    local action = isBuy and "BUY WITH GOLD" or "SELL FOR GOLD"
     local color = StatusColor(summary.status)
 
     tokenSplash.title:SetText(
         "WOW TOKEN ALERT — " .. tostring(summary.status)
     )
     SetColor(tokenSplash.title, color)
-
-    tokenSplash.action:SetText(action)
-    SetColor(tokenSplash.action, color)
 
     local detailPrefix = summary.preview and "TEST PREVIEW  •  " or ""
     tokenSplash.detail:SetText(
