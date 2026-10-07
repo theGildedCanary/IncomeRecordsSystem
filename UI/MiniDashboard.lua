@@ -339,6 +339,102 @@ local miniClose = CreateFrame("Button", nil, miniDashboard, "UIPanelCloseButton"
 miniClose:SetPoint("TOPRIGHT", -3, -3)
 
 -- ============================================================================
+-- WOW TOKEN ALERT
+-- ============================================================================
+
+local miniTokenAlert = MakePanel(miniDashboard, COLORS.softFill)
+miniTokenAlert:SetPoint("TOPLEFT", miniHeader, "BOTTOMLEFT", 2, -6)
+miniTokenAlert:SetPoint("TOPRIGHT", miniHeader, "BOTTOMRIGHT", -2, -6)
+miniTokenAlert:SetHeight(48)
+miniTokenAlert:Hide()
+
+miniTokenAlert.title = MakeText(
+    miniTokenAlert,
+    "heading2",
+    COLORS.goldSoft,
+    "LEFT",
+    "OUTLINE"
+)
+miniTokenAlert.title:SetPoint("TOPLEFT", 9, -7)
+
+miniTokenAlert.action = MakeText(
+    miniTokenAlert,
+    "body",
+    COLORS.goldSoft,
+    "RIGHT"
+)
+miniTokenAlert.action:SetPoint("TOPRIGHT", -9, -7)
+
+miniTokenAlert.detail = MakeText(
+    miniTokenAlert,
+    "helper",
+    COLORS.muted,
+    "LEFT"
+)
+miniTokenAlert.detail:SetPoint("TOPLEFT", 9, -27)
+miniTokenAlert.detail:SetPoint("TOPRIGHT", -9, -27)
+
+local function UpdateMiniTokenAlert(summary)
+    local market = IRS.EnsureTokenMarketDB
+        and IRS:EnsureTokenMarketDB()
+        or nil
+    local settings = market and market.settings or nil
+
+    summary = summary
+        or (IRS.GetTokenMarketSummary and IRS:GetTokenMarketSummary())
+        or nil
+
+    local show = settings
+        and settings.screenAlert ~= false
+        and summary
+        and summary.enabled ~= false
+        and IRS.IsTokenAlertStatus
+        and IRS:IsTokenAlertStatus(summary.status)
+
+    miniTokenAlert:SetShown(show == true)
+
+    if not show then
+        return false
+    end
+
+    local isBuy = summary.status == "GOOD BUY"
+        or summary.status == "EXTREME BUY"
+    local color = isBuy and COLORS.green or COLORS.gold
+    local action = isBuy and "BUY WITH GOLD" or "SELL FOR GOLD"
+
+    miniTokenAlert.title:SetText(
+        "WOW TOKEN — " .. tostring(summary.status)
+    )
+    miniTokenAlert.action:SetText(action)
+    miniTokenAlert.detail:SetText(
+        string.format(
+            "%s  •  %+.1f%% vs %d-day average",
+            IRS:FormatMoney(summary.current or 0, true),
+            summary.differencePercent or 0,
+            tonumber(settings.averageDays) or 7
+        )
+    )
+
+    SetColor(miniTokenAlert.title, color)
+    SetColor(miniTokenAlert.action, color)
+
+    if isBuy then
+        miniTokenAlert:SetBackdropColor(0.10, 0.16, 0.09, 0.88)
+    else
+        miniTokenAlert:SetBackdropColor(0.20, 0.15, 0.06, 0.88)
+    end
+
+    miniTokenAlert:SetBackdropBorderColor(
+        color[1],
+        color[2],
+        color[3],
+        color[4] or 1
+    )
+
+    return true
+end
+
+-- ============================================================================
 -- ACCOUNT NET PERIODS
 -- ============================================================================
 
@@ -630,6 +726,10 @@ function IRS:RefreshMiniDashboard()
     local earnings = IRS:GetCurrentEarnings()
     local characterEarnings = IRS:GetCharacterEarnings()
     local characterName = UnitName("player") or "Character"
+    local tokenSummary = IRS.GetTokenMarketSummary
+        and IRS:GetTokenMarketSummary()
+        or nil
+    local showTokenAlert = UpdateMiniTokenAlert(tokenSummary)
 
     for _, row in ipairs(miniPeriodRows) do
         row.shouldShow = IRS:IsMiniStatShown(row.visibilityKey)
@@ -811,9 +911,36 @@ function IRS:RefreshMiniDashboard()
     miniHeaderSub:ClearAllPoints()
     miniHeaderSub:SetPoint("TOPLEFT", miniHeaderTitle, "BOTTOMLEFT", 0, -3)
 
+    local tokenAlertHeight = 0
+    if showTokenAlert then
+        tokenAlertHeight = math.max(
+            48,
+            heading2Size + helperSize + 25
+        )
+
+        miniTokenAlert:ClearAllPoints()
+        miniTokenAlert:SetPoint("TOPLEFT", miniHeader, "BOTTOMLEFT", 2, -6)
+        miniTokenAlert:SetPoint("TOPRIGHT", miniHeader, "BOTTOMRIGHT", -2, -6)
+        miniTokenAlert:SetHeight(tokenAlertHeight)
+
+        miniTokenAlert.title:ClearAllPoints()
+        miniTokenAlert.title:SetPoint("TOPLEFT", 9, -7)
+
+        miniTokenAlert.action:ClearAllPoints()
+        miniTokenAlert.action:SetPoint("TOPRIGHT", -9, -7)
+
+        miniTokenAlert.detail:ClearAllPoints()
+        miniTokenAlert.detail:SetPoint("TOPLEFT", 9, -(heading2Size + 15))
+        miniTokenAlert.detail:SetPoint("TOPRIGHT", -9, -(heading2Size + 15))
+    end
+
+    local topContentAnchor = showTokenAlert
+        and miniTokenAlert
+        or miniHeader
+
     miniPeriods:ClearAllPoints()
-    miniPeriods:SetPoint("TOPLEFT", miniHeader, "BOTTOMLEFT", 2, -6)
-    miniPeriods:SetPoint("TOPRIGHT", miniHeader, "BOTTOMRIGHT", -2, -6)
+    miniPeriods:SetPoint("TOPLEFT", topContentAnchor, "BOTTOMLEFT", 2, -6)
+    miniPeriods:SetPoint("TOPRIGHT", topContentAnchor, "BOTTOMRIGHT", -2, -6)
 
     local visiblePeriodRows = {}
 
@@ -859,14 +986,14 @@ function IRS:RefreshMiniDashboard()
     else
         miniProjectsHeader:SetPoint(
             "TOPLEFT",
-            miniHeader,
+            topContentAnchor,
             "BOTTOMLEFT",
             3,
             -7
         )
         miniProjectsHeader:SetPoint(
             "TOPRIGHT",
-            miniHeader,
+            topContentAnchor,
             "BOTTOMRIGHT",
             -3,
             -7
@@ -930,7 +1057,7 @@ function IRS:RefreshMiniDashboard()
 
     -- Reserve section begins after whichever project element is actually last.
     local reserveAnchor =
-        visiblePeriodCount > 0 and miniPeriods or miniHeader
+        visiblePeriodCount > 0 and miniPeriods or topContentAnchor
     if showProjects then
         if showAggregate then reserveAnchor = miniProjectsSummary
         elseif miniProjectsMore:IsShown() then reserveAnchor = miniProjectsMore
@@ -966,6 +1093,10 @@ function IRS:RefreshMiniDashboard()
         and (7 + reserveHeaderHeight + (reservesCollapsed and 10 or (2 + reserveBodyHeight + 10)))
         or 0
 
+    local tokenAlertExtraHeight = showTokenAlert
+        and (6 + tokenAlertHeight)
+        or 0
+
     local periodsExtraHeight = visiblePeriodCount > 0
         and (6 + miniPeriods:GetHeight())
         or 0
@@ -973,18 +1104,22 @@ function IRS:RefreshMiniDashboard()
     local frameHeight
 
     if not showProjects then
-        frameHeight = 7 + headerHeight + periodsExtraHeight + 12 + reserveExtraHeight
+        frameHeight = 7 + headerHeight + tokenAlertExtraHeight
+            + periodsExtraHeight + 12 + reserveExtraHeight
 
     elseif collapsed then
-        frameHeight = 7 + headerHeight + periodsExtraHeight
+        frameHeight = 7 + headerHeight + tokenAlertExtraHeight
+            + periodsExtraHeight
             + 7 + projectsHeaderHeight + 10 + reserveExtraHeight
 
     elseif #projects == 0 then
-        frameHeight = 7 + headerHeight + periodsExtraHeight
+        frameHeight = 7 + headerHeight + tokenAlertExtraHeight
+            + periodsExtraHeight
             + 7 + projectsHeaderHeight + 2 + moreHeight + 18 + reserveExtraHeight
 
     else
-        frameHeight = 7 + headerHeight + periodsExtraHeight
+        frameHeight = 7 + headerHeight + tokenAlertExtraHeight
+            + periodsExtraHeight
             + 7 + projectsHeaderHeight + 2 + shownBodyHeight
             + moreHeight
             + (showAggregate and (summaryHeight + 8) or 0)
@@ -1012,6 +1147,14 @@ function IRS:RefreshMiniDashboard()
         miniDashboard:SetHeight(requiredHeight)
     else
         miniDashboard:SetHeight(math.max(requiredHeight, userHeight or 0))
+    end
+end
+
+function IRS:RefreshMiniTokenAlert(summary)
+    UpdateMiniTokenAlert(summary)
+
+    if miniDashboard:IsShown() and IRS.RefreshMiniDashboard then
+        IRS:RefreshMiniDashboard()
     end
 end
 
