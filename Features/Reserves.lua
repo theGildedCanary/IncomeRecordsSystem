@@ -1002,8 +1002,16 @@ local function RefreshChart(reserve, stats)
     for _, row in ipairs(rows) do if row.amount and row.amount > maxValue then maxValue = row.amount end end
     maxValue = math.max(1, math.ceil(maxValue * 1.08))
 
+    chart.targetLabel:SetText("Target\n" .. FormatGold(stats.target))
+    chart.warningLabel:SetText("Floor\n" .. FormatGold(stats.warning))
+
     local chartWidth = math.max(300, chart:GetWidth() or 820)
-    local leftInset, rightInset, bottomInset, topInset = 50, 15, 28, 20
+    local labelWidth = math.max(
+        chart.targetLabel:GetStringWidth() or 0,
+        chart.warningLabel:GetStringWidth() or 0
+    )
+    local leftInset = math.max(50, math.ceil(labelWidth) + 12)
+    local rightInset, bottomInset, topInset = 15, 28, 20
     local plotWidth = math.max(200, chartWidth - leftInset - rightInset)
     local plotHeight = math.max(120, (chart:GetHeight() or 285) - bottomInset - topInset)
     local count = math.max(1, #rows)
@@ -1013,8 +1021,8 @@ local function RefreshChart(reserve, stats)
     local warningY = bottomInset + (plotHeight * ((stats.warning or 0) / maxValue))
     chart.targetLine:ClearAllPoints(); chart.targetLine:SetPoint("BOTTOMLEFT", leftInset, targetY); chart.targetLine:SetPoint("BOTTOMRIGHT", -rightInset, targetY); chart.targetLine:Show()
     chart.warningLine:ClearAllPoints(); chart.warningLine:SetPoint("BOTTOMLEFT", leftInset, warningY); chart.warningLine:SetPoint("BOTTOMRIGHT", -rightInset, warningY); chart.warningLine:Show()
-    chart.targetLabel:ClearAllPoints(); chart.targetLabel:SetPoint("BOTTOMRIGHT", chart, "BOTTOMLEFT", leftInset - 4, targetY - 6); chart.targetLabel:SetText("Target\n" .. FormatGold(stats.target)); chart.targetLabel:Show()
-    chart.warningLabel:ClearAllPoints(); chart.warningLabel:SetPoint("BOTTOMRIGHT", chart, "BOTTOMLEFT", leftInset - 4, warningY - 6); chart.warningLabel:SetText("Floor\n" .. FormatGold(stats.warning)); chart.warningLabel:Show()
+    chart.targetLabel:ClearAllPoints(); chart.targetLabel:SetPoint("BOTTOMRIGHT", chart, "BOTTOMLEFT", leftInset - 4, targetY - 6); chart.targetLabel:Show()
+    chart.warningLabel:ClearAllPoints(); chart.warningLabel:SetPoint("BOTTOMRIGHT", chart, "BOTTOMLEFT", leftInset - 4, warningY - 6); chart.warningLabel:Show()
     chart.zeroLabel:ClearAllPoints(); chart.zeroLabel:SetPoint("BOTTOMRIGHT", chart, "BOTTOMLEFT", leftInset - 4, bottomInset - 5); chart.zeroLabel:Show()
 
     local labelEvery = interval == "monthly" and 1 or math.max(1, math.ceil(count / 6))
