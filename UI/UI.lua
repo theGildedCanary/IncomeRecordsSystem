@@ -554,8 +554,8 @@ local function MakeProjectButton(parent, text, x, y, w, onClick)
     b:SetPoint("TOPLEFT", x, y)
     b:SetSize(w, 28)
     b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 1 })
-    b:SetBackdropColor(0.045, 0.045, 0.042, 1)
-    b:SetBackdropBorderColor(unpack(COLORS.border))
+    b:SetBackdropColor(unpack(COLORS.panelAlt))
+    b:SetBackdropBorderColor(unpack(COLORS.borderSoft))
     b.label = MakeText(b, 9, COLORS.text, "CENTER")
     b.label:SetAllPoints()
     b.label:SetText(text)
@@ -695,12 +695,13 @@ local function EnsureProjectPopupRow(index)
     local b = CreateFrame("Button", nil, projectPopupChild, "BackdropTemplate")
     IRS:StyleButtonFeedback(b)
     b:SetHeight(26)
-    b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8" })
-    b:SetBackdropColor(0.035, 0.038, 0.038, 0.96)
+    b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 1 })
+    b:SetBackdropColor(unpack(COLORS.panelAlt))
+    b:SetBackdropBorderColor(unpack(COLORS.borderSoft))
     b.text = MakeText(b, 9, COLORS.text, "LEFT")
     b.text:SetPoint("LEFT", 8, 0); b.text:SetPoint("RIGHT", -6, 0)
-    b:SetScript("OnEnter", function(self) self:SetBackdropColor(0.10, 0.08, 0.05, 1) end)
-    b:SetScript("OnLeave", function(self) self:SetBackdropColor(0.035, 0.038, 0.038, 0.96) end)
+    b:SetScript("OnEnter", function(self) self:SetBackdropColor(unpack(COLORS.panel)) end)
+    b:SetScript("OnLeave", function(self) self:SetBackdropColor(unpack(COLORS.panelAlt)) end)
     projectPopup.rows[index] = b
     return b
 end
@@ -743,7 +744,8 @@ for i, item in ipairs(sourceChoices) do
     local b = CreateFrame("Button", nil, sourcePopup, "BackdropTemplate")
     IRS:StyleButtonFeedback(b)
     b:SetPoint("TOPLEFT", 4, -4 - ((i - 1) * 28)); b:SetSize(182, 26)
-    b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8" }); b:SetBackdropColor(0.035,0.038,0.038,0.98)
+    b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 1 })
+    b:SetBackdropColor(unpack(COLORS.panelAlt)); b:SetBackdropBorderColor(unpack(COLORS.borderSoft))
     b.text = MakeText(b, 9, COLORS.text, "LEFT"); b.text:SetPoint("LEFT", 8, 0); b.text:SetText(item.label)
     b:SetScript("OnClick", function()
         projectSourceType = item.key
@@ -771,10 +773,12 @@ local function EnsureDetailRow(index)
     if sourceDetailPopup.rows[index] then return sourceDetailPopup.rows[index] end
     local b = CreateFrame("Button", nil, detailChild, "BackdropTemplate")
     IRS:StyleButtonFeedback(b)
-    b:SetHeight(25); b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8" }); b:SetBackdropColor(0.035,0.038,0.038,0.98)
+    b:SetHeight(25)
+    b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 1 })
+    b:SetBackdropColor(unpack(COLORS.panelAlt)); b:SetBackdropBorderColor(unpack(COLORS.borderSoft))
     b.text = MakeText(b, 9, COLORS.text, "LEFT"); b.text:SetPoint("LEFT", 8, 0); b.text:SetPoint("RIGHT", -6, 0)
-    b:SetScript("OnEnter", function(self) self:SetBackdropColor(0.10,0.08,0.05,1) end)
-    b:SetScript("OnLeave", function(self) self:SetBackdropColor(0.035,0.038,0.038,0.98) end)
+    b:SetScript("OnEnter", function(self) self:SetBackdropColor(unpack(COLORS.panel)) end)
+    b:SetScript("OnLeave", function(self) self:SetBackdropColor(unpack(COLORS.panelAlt)) end)
     sourceDetailPopup.rows[index] = b
     return b
 end
@@ -1217,8 +1221,8 @@ function IRS:RefreshProjectsPage(preserveForm)
         end
 
         for _, button in pairs(graphPanel.intervalButtons) do
-            button:SetBackdropColor(0.045, 0.045, 0.042, 1)
-            button:SetBackdropBorderColor(0.25, 0.22, 0.17, 1)
+            button:SetBackdropColor(unpack(COLORS.panelAlt))
+            button:SetBackdropBorderColor(unpack(COLORS.borderSoft))
             SetColor(button.label, COLORS.text)
         end
         return
@@ -1266,8 +1270,8 @@ function IRS:RefreshProjectsPage(preserveForm)
             button:SetBackdropBorderColor(unpack(COLORS.goldSoft))
             SetColor(button.label, COLORS.gold)
         else
-            button:SetBackdropColor(0.045, 0.045, 0.042, 1)
-            button:SetBackdropBorderColor(0.25, 0.22, 0.17, 1)
+            button:SetBackdropColor(unpack(COLORS.panelAlt))
+            button:SetBackdropBorderColor(unpack(COLORS.borderSoft))
             SetColor(button.label, COLORS.text)
         end
     end
@@ -1682,13 +1686,14 @@ local function EnsureScopeRow(index)
     local b = CreateFrame("Button", nil, scopeChild, "BackdropTemplate")
     IRS:StyleButtonFeedback(b)
     b:SetHeight(24)
-    b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8" })
-    b:SetBackdropColor(0.035, 0.038, 0.038, 0.96)
+    b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 1 })
+    b:SetBackdropColor(unpack(COLORS.panelAlt))
+    b:SetBackdropBorderColor(unpack(COLORS.borderSoft))
     b.text = MakeText(b, 9, COLORS.text, "LEFT")
     b.text:SetPoint("LEFT", 8, 0)
     b.text:SetPoint("RIGHT", -6, 0)
-    b:SetScript("OnEnter", function(self) self:SetBackdropColor(0.10, 0.08, 0.05, 1) end)
-    b:SetScript("OnLeave", function(self) self:SetBackdropColor(0.035, 0.038, 0.038, 0.96) end)
+    b:SetScript("OnEnter", function(self) self:SetBackdropColor(unpack(COLORS.panel)) end)
+    b:SetScript("OnLeave", function(self) self:SetBackdropColor(unpack(COLORS.panelAlt)) end)
     scopePopup.rows[index] = b
     return b
 end
@@ -2035,7 +2040,15 @@ local helpHeading = MakeText(helpCommands, 13, COLORS.goldSoft, "LEFT")
 helpHeading:SetPoint("TOPLEFT", 14, -13); helpHeading:SetText("COMMANDS")
 local helpText = MakeText(helpCommands, 11, COLORS.text, "LEFT")
 helpText:SetPoint("TOPLEFT", 14, -44); helpText:SetPoint("RIGHT", -14, 0)
+helpText:SetWordWrap(true)
 helpText:SetText("/irs — toggle the IRS window\n\n/irs mini — toggle the floating mini dashboard\n\n/irs projects — open Savings Projects\n\n/irs reserves — open Reserve Funds\n\n/irs chars — open Characters\n\n/irs reports — open Reports\n\n/irs transactions — print recent transaction log\n\n/irs settings — open Settings\n\n/irs help — open this page\n\n/irs scan — rescan the current character\n\n/irs status — print current net periods to chat")
+
+local function LayoutHelpCommands()
+    local textHeight = math.max(0, helpText:GetStringHeight() or 0)
+    helpCommands:SetHeight(math.max(270, math.ceil(textHeight) + 58))
+end
+
+LayoutHelpCommands()
 
 -- ============================================================================
 -- SECTION 9 — REFRESH / CONTROLLER FUNCTIONS
@@ -2240,14 +2253,14 @@ function IRS:RefreshReportsPage()
         if key == reportPeriod then
             b:SetBackdropColor(0.18, 0.13, 0.05, 1); b:SetBackdropBorderColor(unpack(COLORS.goldSoft)); SetColor(b.label, COLORS.gold)
         else
-            b:SetBackdropColor(0.045, 0.045, 0.042, 1); b:SetBackdropBorderColor(0.25, 0.22, 0.17, 1); SetColor(b.label, COLORS.text)
+            b:SetBackdropColor(unpack(COLORS.panelAlt)); b:SetBackdropBorderColor(unpack(COLORS.borderSoft)); SetColor(b.label, COLORS.text)
         end
     end
     for key, b in pairs(reportViewButtons) do
         if key == reportView then
             b:SetBackdropColor(0.18, 0.13, 0.05, 1); b:SetBackdropBorderColor(unpack(COLORS.goldSoft)); SetColor(b.label, COLORS.gold)
         else
-            b:SetBackdropColor(0.045, 0.045, 0.042, 1); b:SetBackdropBorderColor(0.25, 0.22, 0.17, 1); SetColor(b.label, COLORS.text)
+            b:SetBackdropColor(unpack(COLORS.panelAlt)); b:SetBackdropBorderColor(unpack(COLORS.borderSoft)); SetColor(b.label, COLORS.text)
         end
     end
 
@@ -2585,6 +2598,7 @@ function IRS:RefreshMainWindowSizeLayout()
     if IRS.RefreshToolsLayout then
         IRS:RefreshToolsLayout()
     end
+    LayoutHelpCommands()
 end
 
 -- Recalculates the most overlap-prone IRS layouts after font-style changes.

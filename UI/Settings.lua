@@ -103,8 +103,8 @@ local function ApplySectionVisuals()
             SetColor(button.label, COLORS.gold)
             button.activeBar:Show()
         else
-            button:SetBackdropColor(0, 0, 0, 0)
-            button:SetBackdropBorderColor(0, 0, 0, 0)
+            button:SetBackdropColor(unpack(COLORS.panelAlt))
+            button:SetBackdropBorderColor(unpack(COLORS.borderSoft))
             SetColor(button.label, COLORS.text)
             button.activeBar:Hide()
         end
@@ -306,7 +306,8 @@ for i, choice in ipairs(anchorChoices) do
 
     button:SetScript("OnEnter", function(self)
         if IRS:GetMiniDashboardAnchor() ~= self.anchorKey then
-            self:SetBackdropColor(0.07, 0.065, 0.055, 0.98)
+            self:SetBackdropColor(unpack(COLORS.panel))
+            self:SetBackdropBorderColor(unpack(COLORS.borderSoft))
         end
     end)
 
@@ -791,12 +792,12 @@ function IRS:RefreshSettingsPage()
     local selectedAnchor = IRS:GetMiniDashboardAnchor()
     for anchorKey, button in pairs(anchorButtons) do
         if anchorKey == selectedAnchor then
-            button:SetBackdropColor(0.12, 0.085, 0.035, 1)
+            button:SetBackdropColor(unpack(COLORS.panel))
             button:SetBackdropBorderColor(unpack(COLORS.gold))
             SetColor(button.label, COLORS.gold)
         else
-            button:SetBackdropColor(0.025, 0.028, 0.028, 0.98)
-            button:SetBackdropBorderColor(0.18, 0.20, 0.20, 1)
+            button:SetBackdropColor(unpack(COLORS.panelAlt))
+            button:SetBackdropBorderColor(unpack(COLORS.borderSoft))
             SetColor(button.label, COLORS.text)
         end
     end

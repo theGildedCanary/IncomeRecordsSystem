@@ -1758,9 +1758,9 @@ function IRS:GetCharacterEarnings(characterKey)
     }
 end
 
--- Applies a signed correction to today's account and current-character net
--- only. Historical totals, source categories, and wallet balances stay intact.
-function IRS:AdjustCurrentCharacterDailyEarnings(amount)
+-- Applies a signed correction through the central net-earnings ledger for the
+-- current character, updating account and character day/week/month/total values.
+function IRS:AdjustCurrentCharacterEarnings(amount)
     if not IRS.db then IRS:EnsureDB() end
 
     amount = tonumber(amount)
@@ -1774,19 +1774,10 @@ function IRS:AdjustCurrentCharacterDailyEarnings(amount)
         return false, "Current character has not been scanned yet. Run /irs scan and try again."
     end
 
-    local dayKey = select(1, IRS:GetPeriodKeys())
-    local accountDay = EnsureBucket(IRS.db.tracking.days, dayKey)
-    record.periodEarnings = record.periodEarnings
-        or {days = {}, weeks = {}, months = {}}
-    record.periodEarnings.days = record.periodEarnings.days or {}
-
-    accountDay.earned = (tonumber(accountDay.earned) or 0) + amount
-    record.periodEarnings.days[dayKey] =
-        (tonumber(record.periodEarnings.days[dayKey]) or 0) + amount
+    IRS:RecordEarnings(amount, {}, characterKey)
 
     return true, {
         amount = amount,
-        dayKey = dayKey,
         characterKey = characterKey,
     }
 end

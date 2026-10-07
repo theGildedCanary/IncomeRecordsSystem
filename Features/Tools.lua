@@ -481,7 +481,7 @@ dailyAdjustmentHeading:SetText("MANUAL DAILY INCOME ADJUSTMENT")
 local dailyAdjustmentHelp = MakeText(dailyAdjustmentPanel, "helper", COLORS.muted, "LEFT")
 dailyAdjustmentHelp:SetPoint("TOPLEFT", dailyAdjustmentHeading, "BOTTOMLEFT", 0, -3)
 dailyAdjustmentHelp:SetPoint("TOPRIGHT", -12, 0)
-dailyAdjustmentHelp:SetText("Enter a signed gold amount to correct today's net income for this character. Example: +500g adds income; -500g subtracts it. This changes Today only, not Week, Month, Total, wallet gold, or source categories.")
+dailyAdjustmentHelp:SetText("Enter a signed gold amount to correct this character's net earnings. Example: +500g adds income; -500g subtracts it. The adjustment updates Today, This Week, This Month, and Total for both this character and the account. It does not change wallet gold or source categories.")
 dailyAdjustmentHelp:SetWordWrap(true)
 
 local dailyAdjustmentCharacter = MakeText(dailyAdjustmentPanel, "body", COLORS.text, "LEFT")
@@ -530,7 +530,7 @@ local function ApplyDailyAdjustment()
         return
     end
 
-    local success, result = IRS:AdjustCurrentCharacterDailyEarnings(amount)
+    local success, result = IRS:AdjustCurrentCharacterEarnings(amount)
     if not success then
         dailyAdjustmentStatus:SetText(tostring(result or "Could not apply the adjustment."))
         SetColor(dailyAdjustmentStatus, COLORS.red)
@@ -538,7 +538,10 @@ local function ApplyDailyAdjustment()
     end
 
     dailyAdjustmentInput:SetText("")
-    dailyAdjustmentStatus:SetText("Applied " .. WholeGold(result.amount, true) .. " to today's net income.")
+    dailyAdjustmentStatus:SetText(
+        "Applied " .. WholeGold(result.amount, true)
+            .. " to this character and account earnings totals."
+    )
     SetColor(dailyAdjustmentStatus, COLORS.green)
     RefreshDailyAdjustmentInfo()
     if IRS.RefreshUI then IRS:RefreshUI() end
@@ -582,7 +585,7 @@ local MANUAL_SECTIONS = {
     },
     {
         "MANUAL DAILY INCOME ADJUSTMENT",
-        "Tools can apply a signed correction to the current character's Today net and the account-wide Today net. Enter +500g to add 500 gold or -500g to subtract it. The correction affects Today only; it does not change Week, Month, Total Recorded, wallet gold, or source-category totals."
+        "Tools can apply a signed correction to the current character's and account-wide net earnings. Enter +500g to add 500 gold or -500g to subtract it. The correction updates Today, This Week, This Month, and Total Recorded, but does not change wallet gold or source-category totals."
     },
     {
         "MINI DASHBOARD",

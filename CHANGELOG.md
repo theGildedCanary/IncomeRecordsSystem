@@ -10,7 +10,7 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 
 - Added a seven-day Transaction Log that records each observed wallet change, its IRS ledger effect, transfer classification, and diagnostic reason.
 - Added `/irs transactions` and expanded `/irs debug` with transaction-audit summaries.
-- Added a Tools control for applying signed corrections to the current character's and account-wide Today net without altering longer-period totals or source categories.
+- Added a Tools control for applying signed corrections to the current character's and account-wide net earnings across Today, This Week, This Month, and Total Recorded.
 
 ### Changed
 
