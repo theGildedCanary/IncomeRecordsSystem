@@ -376,11 +376,6 @@ function IRS:MarkProfitsAllocated()
     return true
 end
 
-function IRS:SetToolsSection()
-    if IRS.RefreshToolsPage then IRS:RefreshToolsPage() end
-end
-
-
 local function BuildToolsUI()
     local page = IRS.toolsPage
     local distributionView = IRS.projectAllocationView
@@ -471,27 +466,72 @@ local subtitle = MakeText(page, "body", COLORS.muted, "LEFT")
 subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -3)
 subtitle:SetText("Reference IRS systems and addon behavior. Savings allocation now lives under Projects > Allocation.")
 
-local dailyAdjustmentPanel = MakePanel(page, COLORS.panel)
-dailyAdjustmentPanel:SetPoint("TOPLEFT", 4, -58)
-dailyAdjustmentPanel:SetPoint("TOPRIGHT", -4, -58)
-dailyAdjustmentPanel:SetHeight(118)
+local manualView = CreateFrame("Frame", nil, page)
+manualView:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -4, 4)
+
+local adjustmentView = CreateFrame("Frame", nil, page)
+adjustmentView:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -4, 4)
+adjustmentView:Hide()
+
+local function MakeToolsTab(text, width)
+    local button = MakeButton(page, text, 0, 0, width)
+    button:ClearAllPoints()
+    return button
+end
+
+local manualTab = MakeToolsTab("USER MANUAL", 132)
+manualTab:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", 0, -14)
+local adjustmentTab = MakeToolsTab("DAILY ADJUSTMENT", 160)
+adjustmentTab:SetPoint("LEFT", manualTab, "RIGHT", 8, 0)
+
+local tabsDivider = page:CreateTexture(nil, "ARTWORK")
+tabsDivider:SetColorTexture(unpack(COLORS.borderSoft))
+tabsDivider:SetHeight(2)
+tabsDivider:SetPoint("TOPLEFT", page, "TOPLEFT", 4, -88)
+tabsDivider:SetPoint("TOPRIGHT", page, "TOPRIGHT", -4, -88)
+
+manualView:SetPoint("TOPLEFT", tabsDivider, "BOTTOMLEFT", 0, -10)
+adjustmentView:SetPoint("TOPLEFT", tabsDivider, "BOTTOMLEFT", 0, -10)
+
+local manualHeading = MakeText(manualView, "section", COLORS.goldSoft, "LEFT")
+manualHeading:SetPoint("TOPLEFT", 0, 0)
+manualHeading:SetText("IRS USER'S MANUAL")
+
+local manualIntro = MakeText(manualView, "helper", COLORS.muted, "LEFT")
+manualIntro:SetPoint("TOPLEFT", manualHeading, "BOTTOMLEFT", 0, -4)
+manualIntro:SetText("Built-in reference for the current IRS feature set. Scroll to browse every major system.")
+
+local adjustmentHeading = MakeText(adjustmentView, "section", COLORS.goldSoft, "LEFT")
+adjustmentHeading:SetPoint("TOPLEFT", 0, 0)
+adjustmentHeading:SetText("DAILY INCOME ADJUSTMENT")
+
+local adjustmentIntro = MakeText(adjustmentView, "helper", COLORS.muted, "LEFT")
+adjustmentIntro:SetPoint("TOPLEFT", adjustmentHeading, "BOTTOMLEFT", 0, -4)
+adjustmentIntro:SetPoint("TOPRIGHT", -4, 0)
+adjustmentIntro:SetWordWrap(true)
+adjustmentIntro:SetText("Correct this character's net earnings when an in-game wallet change was missed or recorded incorrectly. Adjustments affect Today, This Week, This Month, and Total for both the character and account.")
+
+local dailyAdjustmentPanel = MakePanel(adjustmentView, COLORS.panel)
+dailyAdjustmentPanel:SetPoint("TOPLEFT", adjustmentIntro, "BOTTOMLEFT", 0, -10)
+dailyAdjustmentPanel:SetPoint("TOPRIGHT", adjustmentView, "TOPRIGHT", 0, 0)
+dailyAdjustmentPanel:SetHeight(90)
 
 local dailyAdjustmentHeading = MakeText(dailyAdjustmentPanel, "section", COLORS.goldSoft, "LEFT")
 dailyAdjustmentHeading:SetPoint("TOPLEFT", 12, -8)
-dailyAdjustmentHeading:SetText("MANUAL DAILY INCOME ADJUSTMENT")
+dailyAdjustmentHeading:SetText("CURRENT CHARACTER")
 
 local dailyAdjustmentHelp = MakeText(dailyAdjustmentPanel, "helper", COLORS.muted, "LEFT")
 dailyAdjustmentHelp:SetPoint("TOPLEFT", dailyAdjustmentHeading, "BOTTOMLEFT", 0, -3)
 dailyAdjustmentHelp:SetPoint("TOPRIGHT", -12, 0)
-dailyAdjustmentHelp:SetText("Enter a signed gold amount to correct this character's net earnings. Example: +500g adds income; -500g subtracts it. The adjustment updates Today, This Week, This Month, and Total for both this character and the account. It does not change wallet gold or source categories.")
+dailyAdjustmentHelp:SetText("This adjustment does not change wallet gold or source categories.")
 dailyAdjustmentHelp:SetWordWrap(true)
 
 local dailyAdjustmentCharacter = MakeText(dailyAdjustmentPanel, "body", COLORS.text, "LEFT")
-dailyAdjustmentCharacter:SetPoint("TOPLEFT", 12, -66)
+dailyAdjustmentCharacter:SetPoint("TOPLEFT", 12, -46)
 dailyAdjustmentCharacter:SetWidth(370)
 
 local dailyAdjustmentInputLabel = MakeText(dailyAdjustmentPanel, "helper", COLORS.goldSoft, "RIGHT")
-dailyAdjustmentInputLabel:SetPoint("TOPLEFT", 390, -67)
+dailyAdjustmentInputLabel:SetPoint("TOPLEFT", 390, -47)
 dailyAdjustmentInputLabel:SetWidth(112)
 dailyAdjustmentInputLabel:SetText("ADJUSTMENT")
 
@@ -511,7 +551,7 @@ dailyAdjustmentButton:SetPoint("LEFT", dailyAdjustmentInput, "RIGHT", 12, 0)
 dailyAdjustmentButton:SetSize(92, 30)
 
 local dailyAdjustmentStatus = MakeText(dailyAdjustmentPanel, "helper", COLORS.muted, "LEFT")
-dailyAdjustmentStatus:SetPoint("TOPLEFT", dailyAdjustmentCharacter, "BOTTOMLEFT", 0, -6)
+dailyAdjustmentStatus:SetPoint("TOPLEFT", dailyAdjustmentPanel, "TOPLEFT", 12, -76)
 dailyAdjustmentStatus:SetPoint("RIGHT", -12, 0)
 
 local function RefreshDailyAdjustmentInfo()
@@ -556,18 +596,6 @@ dailyAdjustmentInput:SetScript("OnEnterPressed", function(self)
     self:ClearFocus()
 end)
 dailyAdjustmentInput:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-
-local manualView = CreateFrame("Frame", nil, page)
-manualView:SetPoint("TOPLEFT", 4, -190)
-manualView:SetPoint("BOTTOMRIGHT", -4, 4)
-
-local manualHeading = MakeText(manualView, "section", COLORS.goldSoft, "LEFT")
-manualHeading:SetPoint("TOPLEFT", 0, 0)
-manualHeading:SetText("IRS USER'S MANUAL")
-
-local manualIntro = MakeText(manualView, "helper", COLORS.muted, "LEFT")
-manualIntro:SetPoint("TOPLEFT", manualHeading, "BOTTOMLEFT", 0, -4)
-manualIntro:SetText("Built-in reference for the current IRS feature set. Scroll to browse every major system.")
 
 local manualScroll = CreateFrame("ScrollFrame", "IncomeRecordsSystemToolsManualScroll", manualView, "UIPanelScrollFrameTemplate")
 manualScroll:SetPoint("TOPLEFT", 0, -48)
@@ -671,6 +699,36 @@ local function LayoutManual()
     end
     manualChild:SetHeight(math.max(1, y + 6))
 end
+
+function IRS:SetToolsSection(section)
+    EnsureToolsDB()
+    IRS.db.ui = IRS.db.ui or {}
+    section = section == "adjustment" and "adjustment" or "manual"
+    IRS.db.ui.toolsSection = section
+
+    local adjustmentActive = section == "adjustment"
+    manualView:SetShown(not adjustmentActive)
+    adjustmentView:SetShown(adjustmentActive)
+
+    manualTab:SetBackdropColor(unpack(adjustmentActive and COLORS.panel or COLORS.panelAlt))
+    manualTab:SetBackdropBorderColor(unpack(adjustmentActive and COLORS.borderSoft or COLORS.goldSoft))
+    SetColor(manualTab.label, adjustmentActive and COLORS.text or COLORS.gold)
+
+    adjustmentTab:SetBackdropColor(unpack(adjustmentActive and COLORS.panelAlt or COLORS.panel))
+    adjustmentTab:SetBackdropBorderColor(unpack(adjustmentActive and COLORS.goldSoft or COLORS.borderSoft))
+    SetColor(adjustmentTab.label, adjustmentActive and COLORS.gold or COLORS.text)
+
+    if adjustmentActive then
+        subtitle:SetText("Correct this character's net earnings when an in-game wallet change was missed or recorded incorrectly.")
+        RefreshDailyAdjustmentInfo()
+    else
+        subtitle:SetText("Reference IRS systems and addon behavior. Savings allocation now lives under Projects > Allocation.")
+        LayoutManual()
+    end
+end
+
+manualTab:SetScript("OnClick", function() IRS:SetToolsSection("manual") end)
+adjustmentTab:SetScript("OnClick", function() IRS:SetToolsSection("adjustment") end)
 
 local distHeading = MakeText(distributionView, "section", COLORS.goldSoft, "LEFT")
 distHeading:SetPoint("TOPLEFT", 0, 0)
@@ -905,6 +963,7 @@ function IRS:RefreshToolsPage()
     EnsureToolsDB()
     LayoutManual()
     RefreshDailyAdjustmentInfo()
+    IRS:SetToolsSection(IRS.db.ui and IRS.db.ui.toolsSection or "manual")
 end
 
 function IRS:RefreshProjectAllocationPage()
