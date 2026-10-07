@@ -2246,7 +2246,10 @@ end
 -- breakdown) from data supplied by Core.lua.
 function IRS:RefreshReportsPage()
     if not IRS.db then return end
-    local scopeKey = reportScope == "all" and nil or reportScope
+    local scopeKey
+    if reportScope ~= "all" then
+        scopeKey = reportScope
+    end
     scopeButton.text:SetText(IRS:GetScopeName(reportScope))
 
     for key, b in pairs(reportPeriodButtons) do

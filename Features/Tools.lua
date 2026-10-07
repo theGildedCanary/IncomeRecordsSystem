@@ -334,7 +334,9 @@ function IRS:GetProfitDistribution()
         availableProfit=profit, distributed=math.max(0, distributed),
         remainder=math.max(0, profit-distributed),
         totalWeight=#rows > 0 and 100 or 0,
-        reservePercent=reservePercent, reserveSuggested=reserveSuggested,
+        reservePercent=reservePercent,
+        reserveSplitPercent=RoundPercent(100 - projectPool),
+        reserveSuggested=reserveSuggested,
         projectPoolPercent=projectPool, rows=rows,
         completedExcluded=completed, unavailableExcluded=unavailable,
         lastAllocationAt=tonumber(state.lastAllocationAt),
@@ -793,13 +795,13 @@ local reserveDetail=MakeText(reservePanel,"helper",COLORS.muted,"LEFT")
 reserveDetail:SetPoint("TOPLEFT",reserveTitle,"BOTTOMLEFT",0,-4)
 reserveDetail:SetText("Manual share of total profit set aside for Reserve Funds before Project Distribution is applied.")
 local reservePercentLabel=MakeText(reservePanel,"helper",COLORS.goldSoft,"RIGHT")
-reservePercentLabel:SetPoint("RIGHT",-250,10); reservePercentLabel:SetText("RESERVE %")
+reservePercentLabel:SetPoint("RIGHT",-330,10); reservePercentLabel:SetText("RESERVE %")
 local reserveInput=CreateFrame("EditBox",nil,reservePanel,"InputBoxTemplate")
 reserveInput:SetSize(62,24); reserveInput:SetPoint("LEFT",reservePercentLabel,"RIGHT",8,0)
 reserveInput:SetAutoFocus(false); reserveInput:SetJustifyH("RIGHT"); reserveInput:SetFontObject(GameFontHighlightSmall)
 reserveInput:SetMaxLetters(5); reserveInput:SetNumeric(false)
 local reserveSplit=MakeText(reservePanel,"body",COLORS.text,"RIGHT")
-reserveSplit:SetPoint("RIGHT",-105,10); reserveSplit:SetWidth(72)
+reserveSplit:SetPoint("RIGHT",-145,10); reserveSplit:SetWidth(105)
 local reserveSuggested=MakeText(reservePanel,"body",COLORS.gold,"RIGHT")
 reserveSuggested:SetPoint("RIGHT",-10,10); reserveSuggested:SetWidth(92)
 
@@ -954,7 +956,7 @@ function IRS:RefreshProjectAllocationPage()
     if not reserveInput:HasFocus() then
         reserveInput:SetText(string.format("%.1f",data.reservePercent or 0):gsub("%.0$",""))
     end
-    reserveSplit:SetText("Split "..PercentText(data.reservePercent or 0))
+    reserveSplit:SetText("Effective "..PercentText(data.reserveSplitPercent or 0))
     reserveSuggested:SetText(WholeGold(data.reserveSuggested or 0))
 
     footerLine:SetText(string.format(
