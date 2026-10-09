@@ -414,9 +414,11 @@ end
 local function QueueWallet(
     walletAmount,
     characterKey,
-    guildKey,
-    transactionId
+    storageKey,
+    transactionId,
+    storageType
 )
+    storageType = storageType or "guild"
     runtime.nextWalletId = (tonumber(runtime.nextWalletId) or 0) + 1
     local id = runtime.nextWalletId
 
@@ -424,8 +426,8 @@ local function QueueWallet(
         id = id,
         amount = walletAmount,
         characterKey = characterKey,
-        expectedStorageType = "guild",
-        expectedStorageKey = guildKey,
+        expectedStorageType = storageType,
+        expectedStorageKey = storageKey,
         transactionId = transactionId,
         at = Now(),
     })
@@ -433,11 +435,11 @@ local function QueueWallet(
     if IRS.UpdateTransactionEvent then
         IRS:UpdateTransactionEvent(transactionId, {
             disposition = "PENDING",
-            reason = "GUILD_PENDING",
-            fromType = walletAmount < 0 and "character" or "guild",
-            fromKey = walletAmount < 0 and characterKey or guildKey,
-            toType = walletAmount < 0 and "guild" or "character",
-            toKey = walletAmount < 0 and guildKey or characterKey,
+            reason = storageType == "warband" and "WARBAND_PENDING" or "GUILD_PENDING",
+            fromType = walletAmount < 0 and "character" or storageType,
+            fromKey = walletAmount < 0 and characterKey or storageKey,
+            toType = walletAmount < 0 and storageType or "character",
+            toKey = walletAmount < 0 and storageKey or characterKey,
         })
     end
 
@@ -587,6 +589,21 @@ function IRS:FilterInternalWalletChange(
             characterKey,
             openGuildKey,
             transactionId
+        )
+        return 0, true
+    end
+
+    -- The Warband balance can lag PLAYER_MONEY too. Defer while a bank is open;
+    -- the follow-up Warband rescans will supply the matching balance change.
+    if remaining ~= 0
+        and IRS.warbandBankRuntime
+        and IRS.warbandBankRuntime.isOpen == true then
+        QueueWallet(
+            remaining,
+            characterKey,
+            nil,
+            transactionId,
+            "warband"
         )
         return 0, true
     end

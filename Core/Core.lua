@@ -4006,6 +4006,19 @@ eventFrame:RegisterEvent("QUEST_TURNED_IN")
 eventFrame:RegisterEvent("MAIL_INBOX_UPDATE")
 eventFrame:RegisterEvent("BANKFRAME_OPENED")
 eventFrame:RegisterEvent("PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED")
+eventFrame:RegisterEvent("BANKFRAME_CLOSED")
+pcall(eventFrame.RegisterEvent, eventFrame, "ACCOUNT_MONEY")
+IRS.warbandBankRuntime = IRS.warbandBankRuntime or { isOpen = false }
+
+-- The Warband balance can update after PLAYER_MONEY, so re-read it a few times
+-- to catch the matching side of a wallet <-> Warband Bank transfer.
+local function QueueWarbandRescans()
+    for _, delay in ipairs({ 0.15, 0.5, 1.0 }) do
+        C_Timer.After(delay, function()
+            if IRS.db then IRS:ScanWarbandGold() end
+        end)
+    end
+end
 eventFrame:RegisterEvent("GUILDBANKFRAME_OPENED")
 eventFrame:RegisterEvent("GUILDBANKFRAME_CLOSED")
 eventFrame:RegisterEvent("GUILDBANK_UPDATE_MONEY")
@@ -4071,8 +4084,15 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
             loginScanPending = false
         end)
     elseif event == "BANKFRAME_OPENED" or event == "PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED" then
+        if event == "BANKFRAME_OPENED" then
+            IRS.warbandBankRuntime.isOpen = true
+        end
         IRS:ScanWarbandGold()
         QueueScan(0.2)
+    elseif event == "BANKFRAME_CLOSED" then
+        IRS.warbandBankRuntime.isOpen = false
+    elseif event == "ACCOUNT_MONEY" then
+        IRS:ScanWarbandGold()
     elseif event == "GUILDBANKFRAME_OPENED" then
         IRS.guildBankRuntime.isOpen = true
         IRS.guildBankRuntime.hasMoneyUpdate = false
@@ -4135,6 +4155,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
     elseif event == "PLAYER_MONEY" then
         IRS:HandleMoneyChange()
         QueueMoneyScans()
+        if IRS.warbandBankRuntime.isOpen then QueueWarbandRescans() end
 
         if IRS.guildBankRuntime and IRS.guildBankRuntime.isOpen then
             C_Timer.After(0.20, function()
