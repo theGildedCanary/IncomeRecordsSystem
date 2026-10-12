@@ -114,18 +114,18 @@ local function BuildPageScroll(key, page)
     scroll._irsHasOverflow = false
 
     scroll:SetScript("OnMouseWheel", function(self, delta)
-        if not self._irsHasOverflow then return end
-
-        local child = self._irsPage
-        local viewportHeight = self:GetHeight() or 0
-        local childHeight = child and child:GetHeight() or viewportHeight
-        local maxScroll = math.max(0, childHeight - viewportHeight)
+        -- Descendants can extend beyond the page's nominal height. Use the
+        -- same actual range as the scrollbar so the wheel can reach them too.
+        local maxScroll = math.max(0, self:GetVerticalScrollRange() or 0)
         local current = self:GetVerticalScroll() or 0
         local step = IsShiftKeyDown and IsShiftKeyDown() and 120 or 48
-
-        self:SetVerticalScroll(
-            math.max(0, math.min(maxScroll, current - (delta * step)))
-        )
+        local target = math.max(0, math.min(maxScroll, current - (delta * step)))
+        local bar = GetScrollBar(self)
+        if bar then
+            bar:SetValue(target)
+        else
+            self:SetVerticalScroll(target)
+        end
     end)
 
     PositionScrollBarOutsideContent(scroll)
