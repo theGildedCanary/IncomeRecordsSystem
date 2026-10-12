@@ -10,10 +10,16 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 
 ### Added
 
+<<<<<<< HEAD
 - Added a movable, account-wide Micro Report with selectable gold displays, optional labels, and saved settings.
 - Added Micro Report hover details covering bank balances, WoW Token prices, profit per hour, and session, daily, weekly, and monthly earned, spent, and net figures.
 - Added right-click display-mode controls for the Micro Report.
 
+=======
+- Added a movable Micro Report with selectable gold displays, optional label, and account-wide saved visibility, position, and display mode.
+- Added Micro Report hover details for account and bank balances, token price, profit per hour, and session/daily/weekly/monthly earnings, spending, and net totals.
+- Added Micro Report context-menu controls for display mode and label visibility.
+>>>>>>> cd9403b3b749b20d4eb20ffad557cc842ecd73ae
 
 - Added a seven-day Transaction Log that records each observed wallet change, its IRS ledger effect, transfer classification, and diagnostic reason.
 - Added `/irs transactions` and expanded `/irs debug` with transaction-audit summaries.
@@ -35,7 +41,15 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 
 - Existing Profit Distribution percentages are migrated into the new linked Project Distribution plan so current project priorities are preserved when upgrading.
 - Shared-source Project accounting now follows the calculated Split % rather than conflating Project Distribution with the post-Reserve effective allocation.
+<<<<<<< HEAD
 - Corrected Micro Report daily spending tracking.
+=======
+- Fixed Micro Report daily spending totals.
+
+### Removed
+
+
+>>>>>>> cd9403b3b749b20d4eb20ffad557cc842ecd73ae
 
 ## [1.1.0] - 2026-10-06
 
