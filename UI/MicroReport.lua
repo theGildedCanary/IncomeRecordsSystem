@@ -301,30 +301,28 @@ local function RefreshTooltip()
     tooltip:AddLine(" ")
     local duration = GetTime() - rateStarted
     Row("Profit Per Hour:", duration >= 1 and (sessionNet - rateBaseline) * 3600 / duration or 0)
-    local function Period(label, earned, spent, net)
+    local function Period(label, earned, spent, net, partial)
         tooltip:AddLine(" ")
-        Row(label .. " Earned:", earned)
-        Row(label .. " Spent:", spent)
+        local marker = partial and "*" or ""
+        Row(label .. " Earned" .. marker .. ":", earned)
+        Row(label .. " Spent" .. marker .. ":", spent)
         Row(label .. " Net:", net)
     end
     Period("Session", sessionEarned, sessionSpent, sessionNet)
     local day, week, month = IRS:GetPeriodKeys()
-    local tracking = IRS.db.tracking
     local incomplete = false
     for _, period in ipairs({
-        {"Daily", tracking.days[day]},
-        {"Weekly", tracking.weeks[week]},
-        {"Monthly", tracking.months[month]},
+        {"Daily", "days", day},
+        {"Weekly", "weeks", week},
+        {"Monthly", "months", month},
     }) do
-        local bucket = period[2]
-        local complete = not bucket or bucket.flowsComplete == true
-        incomplete = incomplete or not complete
-        Period(period[1], complete and (bucket and bucket.income or 0) or nil,
-            complete and (bucket and bucket.expense or 0) or nil, bucket and bucket.earned or 0)
+        local summary = IRS:GetPeriodFlowSummary(period[2], period[3])
+        incomplete = incomplete or not summary.complete
+        Period(period[1], summary.income, summary.expense, summary.net, not summary.complete)
     end
     if incomplete then
         tooltip:AddLine(" ")
-        tooltip:AddLine("Older periods have net history only. Earned/spent totals become available for newly tracked periods.", 0.68, 0.62, 0.51, true)
+        tooltip:AddLine("* Partial history: earned/spent include recorded amounts and keep updating. Net includes older history, so it may differ from earned minus spent.", 0.68, 0.62, 0.51, true)
     end
     tooltip:Show()
     StyleTooltip()

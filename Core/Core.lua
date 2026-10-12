@@ -1164,6 +1164,40 @@ function IRS:GetTransactionSummary(dayKey, characterKey)
     return summary
 end
 
+-- Legacy buckets only saved net. Recover retained audit events when no gross
+-- counters exist; never overwrite counters already collected by newer builds.
+-- The audit log is bounded, so recovered history remains explicitly partial.
+function IRS:EnsurePeriodFlows(bucket, period, key)
+    if bucket.income ~= nil then return end
+    bucket.income, bucket.expense, bucket.flowsComplete = 0, 0, false
+    for _, event in ipairs(IRS.db.transactions and IRS.db.transactions.events or {}) do
+        local at = tonumber(event.at) or 0
+        local day = event.dayKey or date("%Y-%m-%d", at)
+        local matches = (period == "days" and day == key)
+            or (period == "months" and day:sub(1, 7) == key)
+            or (period == "weeks" and tonumber(key)
+                and at >= tonumber(key) and at < tonumber(key) + 7 * 86400)
+        if matches then
+            local amount = math.floor(tonumber(event.ledgerAmount) or 0)
+            if amount > 0 then bucket.income = bucket.income + amount
+            else bucket.expense = bucket.expense - amount end
+        end
+    end
+end
+
+function IRS:GetPeriodFlowSummary(period, key)
+    if not IRS.db then IRS:EnsureDB() end
+    local bucket = IRS.db.tracking[period][key]
+    if not bucket then return {income = 0, expense = 0, net = 0, complete = true} end
+    IRS:EnsurePeriodFlows(bucket, period, key)
+    return {
+        income = bucket.income or 0,
+        expense = bucket.expense or 0,
+        net = bucket.earned or 0,
+        complete = bucket.flowsComplete == true,
+    }
+end
+
 -- CENTRAL LEDGER WRITER.
 -- amount may be positive (income) or negative (spending/loss).
 -- sourceDeltas contains any Blizzard income categories that changed.
@@ -1190,16 +1224,14 @@ function IRS:RecordEarnings(amount, sourceDeltas, characterKey, reversesTransfer
     local dayBucket = EnsureBucket(tracking.days, dayKey)
     local weekBucket = EnsureBucket(tracking.weeks, weekKey)
     local monthBucket = EnsureBucket(tracking.months, monthKey)
+    IRS:EnsurePeriodFlows(dayBucket, "days", dayKey)
+    IRS:EnsurePeriodFlows(weekBucket, "weeks", weekKey)
+    IRS:EnsurePeriodFlows(monthBucket, "months", monthKey)
 
     if amount ~= 0 then
         -- Keep gross flows separately: a late internal-transfer match removes
         -- the original flow instead of manufacturing income or spending.
         for _, bucket in ipairs({dayBucket, weekBucket, monthBucket}) do
-            if bucket.income == nil then
-                bucket.income, bucket.expense = 0, 0
-                -- Existing net history cannot reconstruct gross flows.
-                bucket.flowsComplete = false
-            end
             local field = amount > 0 and "income" or "expense"
             local delta = math.abs(amount)
             if reversesTransfer then
