@@ -6,7 +6,13 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-12
+
 ### Added
+
+- Added a movable Micro Report with selectable gold displays, optional label, and account-wide saved visibility, position, and display mode.
+- Added Micro Report hover details for account and bank balances, token price, profit per hour, and session/daily/weekly/monthly earnings, spending, and net totals.
+- Added Micro Report context-menu controls for display mode and label visibility.
 
 - Added a seven-day Transaction Log that records each observed wallet change, its IRS ledger effect, transfer classification, and diagnostic reason.
 - Added `/irs transactions` and expanded `/irs debug` with transaction-audit summaries.
@@ -28,6 +34,7 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 
 - Existing Profit Distribution percentages are migrated into the new linked Project Distribution plan so current project priorities are preserved when upgrading.
 - Shared-source Project accounting now follows the calculated Split % rather than conflating Project Distribution with the post-Reserve effective allocation.
+- Fixed Micro Report daily spending totals.
 
 ### Removed
 
@@ -87,7 +94,8 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 - Profit Distribution Calculator.
 - Character, report, settings, and diagnostic tools.
 
-[Unreleased]: https://github.com/theGildedCanary/IncomeRecordsSystem/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/theGildedCanary/IncomeRecordsSystem/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/theGildedCanary/IncomeRecordsSystem/compare/v1.2.0...v1.3.0
 [1.1.0]: https://github.com/theGildedCanary/IncomeRecordsSystem/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/theGildedCanary/IncomeRecordsSystem/compare/v0.17.3...v1.0.0
 [0.17.3]: https://github.com/theGildedCanary/IncomeRecordsSystem/releases/tag/v0.17.3
