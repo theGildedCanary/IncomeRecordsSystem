@@ -87,7 +87,7 @@ local function FormatGold(copper, includeChange)
     local gold = math.floor(absolute / 10000)
     local silver = math.floor((absolute % 10000) / 100)
     local copperOnly = absolute % 100
-    local goldText = BreakUpLargeNumbers and BreakUpLargeNumbers(gold) or tostring(gold)
+    local goldText = IRS:FormatCount(gold)
     local sign = negative and "-" or ""
 
     if gold > 0 then

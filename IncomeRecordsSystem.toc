@@ -24,6 +24,7 @@ Features\Reserves.lua
 Features\Tools.lua
 
 # Supporting UI modules
+UI\MicroReport.lua
 UI\Settings.lua
 UI\MiniDashboard.lua
 UI\Resize.lua

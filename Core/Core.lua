@@ -504,6 +504,9 @@ end
 local function NewBucket()
     return {
         earned = 0,
+        income = 0,
+        expense = 0,
+        flowsComplete = true,
         sources = {
             goldLooted = 0,
             questGold = 0,
@@ -1165,7 +1168,7 @@ end
 -- amount may be positive (income) or negative (spending/loss).
 -- sourceDeltas contains any Blizzard income categories that changed.
 -- Writes the change to account totals AND the selected character's history.
-function IRS:RecordEarnings(amount, sourceDeltas, characterKey)
+function IRS:RecordEarnings(amount, sourceDeltas, characterKey, reversesTransfer)
     if not IRS.db then IRS:EnsureDB() end
     -- "Earnings" is a net ledger: positive wallet changes are income and
     -- negative wallet changes are spending/losses.
@@ -1189,6 +1192,27 @@ function IRS:RecordEarnings(amount, sourceDeltas, characterKey)
     local monthBucket = EnsureBucket(tracking.months, monthKey)
 
     if amount ~= 0 then
+        -- Keep gross flows separately: a late internal-transfer match removes
+        -- the original flow instead of manufacturing income or spending.
+        for _, bucket in ipairs({dayBucket, weekBucket, monthBucket}) do
+            if bucket.income == nil then
+                bucket.income, bucket.expense = 0, 0
+                -- Existing net history cannot reconstruct gross flows.
+                bucket.flowsComplete = false
+            end
+            local field = amount > 0 and "income" or "expense"
+            local delta = math.abs(amount)
+            if reversesTransfer then
+                field = amount > 0 and "expense" or "income"
+                delta = -delta
+                -- A delayed match can cross a period boundary. The net ledger
+                -- applies it now, but this period lacks the original gross flow.
+                if (bucket[field] or 0) + delta < 0 then
+                    bucket.flowsComplete = false
+                end
+            end
+            bucket[field] = math.max(0, (bucket[field] or 0) + delta)
+        end
         tracking.totalEarned = (tracking.totalEarned or 0) + amount
         dayBucket.earned = (dayBucket.earned or 0) + amount
         weekBucket.earned = (weekBucket.earned or 0) + amount
@@ -1657,6 +1681,18 @@ function IRS:ScanCurrentCharacter()
     IRS:EndStartupTiming(scanTiming)
 end
 
+-- Count each cached guild bank once using the same ownership rule as Transfers.
+function IRS:GetInternalGuildBankGold()
+    if not IRS.db then IRS:EnsureDB() end
+    local total = 0
+    for key, record in pairs(IRS.db.guildBanks or {}) do
+        if IRS.IsInternalGuildBank and IRS:IsInternalGuildBank(key) then
+            total = total + math.max(0, tonumber(record.money) or 0)
+        end
+    end
+    return math.floor(total)
+end
+
 -- Aggregates the latest Blizzard lifetime statistics across TRACKED characters.
 -- These values power Account Overview. They are separate from the IRS net ledger.
 function IRS:GetTotals()
@@ -1697,7 +1733,8 @@ function IRS:GetTotals()
         end
     end
 
-    totals.knownWealth = totals.characterGold + totals.warbandGold
+    totals.internalGuildGold = IRS:GetInternalGuildBankGold()
+    totals.knownWealth = totals.characterGold + totals.warbandGold + totals.internalGuildGold
 
     -- Unlike Travel/Postage, this is IRS-observed spending rather than a Blizzard
     -- lifetime statistic. It begins with the version that introduced tracking.
@@ -2351,8 +2388,8 @@ function IRS:GetSortedGuildBanks()
     return rows
 end
 
--- Adds last-known wallets for ALL scanned characters plus the Warband Bank.
--- Guild-bank gold is deliberately excluded from "Account Liquid Gold".
+-- Adds last-known wallets for ALL scanned characters, the Warband Bank,
+-- and guild banks marked internal in Transfers.
 function IRS:GetAccountLiquidGoldAllCharacters()
     if not IRS.db then IRS:EnsureDB() end
     local total = 0
@@ -2362,7 +2399,7 @@ function IRS:GetAccountLiquidGoldAllCharacters()
     if IRS.db.account.warbandGoldSeen then
         total = total + math.max(0, tonumber(IRS.db.account.warbandGold) or 0)
     end
-    return math.floor(total)
+    return math.floor(total + IRS:GetInternalGuildBankGold())
 end
 
 -- Resolves a project's selected funding source and returns:
@@ -3947,23 +3984,19 @@ function IRS:FormatMoney(copper, compact)
     local copperOnly = absolute % 100
     local sign = negative and "-" or ""
 
+    local formattedGold = IRS:FormatCount(gold)
     if compact then
-        if gold >= 1000000 then
-            return string.format("%s%.2fm g", sign, gold / 1000000)
-        elseif gold >= 1000 then
-            return string.format("%s%.1fk g", sign, gold / 1000)
-        end
-        return string.format("%s%dg %02ds %02dc", sign, gold, silver, copperOnly)
+        return string.format("%s%sg %02ds %02dc", sign, formattedGold, silver, copperOnly)
     end
-
-    local formattedGold = BreakUpLargeNumbers and BreakUpLargeNumbers(gold) or tostring(gold)
     return string.format("%s%s g %02d s %02d c", sign, formattedGold, silver, copperOnly)
 end
 
 -- Adds normal large-number formatting to a simple count.
 function IRS:FormatCount(number)
     number = math.floor(tonumber(number) or 0)
-    return BreakUpLargeNumbers and BreakUpLargeNumbers(number) or tostring(number)
+    local digits = string.format("%.0f", math.abs(number))
+    local grouped = digits:reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
+    return (number < 0 and "-" or "") .. grouped
 end
 
 -- Debug/chat helper that prints all known characters and their tracking state.

@@ -119,7 +119,7 @@ local function FormatGold(copper)
     local value = tonumber(copper) or 0
     local negative = value < 0
     local gold = math.floor(math.abs(value) / 10000)
-    local goldText = BreakUpLargeNumbers and BreakUpLargeNumbers(gold) or tostring(gold)
+    local goldText = IRS:FormatCount(gold)
     return (negative and "-" or "") .. goldText .. "g"
 end
 

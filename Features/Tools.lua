@@ -424,7 +424,7 @@ local function WholeGold(copper, signed)
     copper = math.floor(tonumber(copper) or 0)
     local negative = copper < 0
     local gold = math.floor(math.abs(copper) / 10000)
-    local text = BreakUpLargeNumbers and BreakUpLargeNumbers(gold) or tostring(gold)
+    local text = IRS:FormatCount(gold)
     if signed and copper > 0 then return "+" .. text .. "g" end
     if negative then return "-" .. text .. "g" end
     return text .. "g"
@@ -655,7 +655,7 @@ local MANUAL_SECTIONS = {
     },
     {
         "SOURCES & GUILD BANKS",
-        "Account Liquid Gold uses last-known character wallets plus the Warband Bank and excludes Guild Banks. Warband Bank uses Blizzard's account-bank balance. Character uses the selected character wallet. Guild Bank uses the last valid balance IRS observed for the chosen guild; opening the Guild Bank refreshes its cache. If a source has never been observed, IRS reports it as unavailable rather than inventing a value."
+        "Account Liquid Gold uses last-known character wallets, the Warband Bank, and Guild Banks marked internal in Transfers. Warband Bank uses Blizzard's account-bank balance. Character uses the selected character wallet. Guild Bank uses the last valid balance IRS observed for the chosen guild; opening the Guild Bank refreshes its cache. If a source has never been observed, IRS reports it as unavailable rather than inventing a value."
     },
     {
         "SETTINGS & RESIZING",

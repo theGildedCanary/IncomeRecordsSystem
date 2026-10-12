@@ -126,7 +126,10 @@ function IRS:SetInternalGuildBank(guildKey, enabled)
     local db = IRS:EnsureInternalTransferDB()
     db.ownedGuildBanks[guildKey] = enabled == true
 
-    if IRS.RefreshInternalTransferSettingsSection then
+    if IRS.RefreshMicroReport then IRS:RefreshMicroReport() end
+    if IRS.RefreshUI then
+        IRS:RefreshUI()
+    elseif IRS.RefreshInternalTransferSettingsSection then
         IRS:RefreshInternalTransferSettingsSection()
     end
 end
@@ -313,7 +316,7 @@ local function ConsumeLateRecordedStorage(storage)
             -- The wallet entry was already written to both ledgers. Undo the
             -- matched transfer amount before logging it as internal movement.
             local correction = walletAmount < 0 and matched or -matched
-            IRS:RecordEarnings(correction, {}, wallet.characterKey)
+            IRS:RecordEarnings(correction, {}, wallet.characterKey, true)
             if IRS.RecordTransactionLedgerEffect then
                 IRS:RecordTransactionLedgerEffect(
                     wallet.transactionId,
@@ -699,7 +702,7 @@ function IRS:BuildInternalTransferSettingsSection(parent)
     guildDesc:SetPoint("TOPLEFT", 12, -34)
     guildDesc:SetPoint("RIGHT", -12, 0)
     guildDesc:SetText(
-        "Savings Project Guild Banks default to internal. Uncheck a shared Guild Bank if transfers to it should count as money leaving your finances."
+        "Internal Guild Banks count toward account gold using their last-known balance. Savings Project Guild Banks default to internal. Uncheck a shared bank to exclude its gold and count transfers to it as money leaving your finances."
     )
 
     local scroll = CreateFrame(
@@ -708,7 +711,7 @@ function IRS:BuildInternalTransferSettingsSection(parent)
         guildPanel,
         "UIPanelScrollFrameTemplate"
     )
-    scroll:SetPoint("TOPLEFT", 10, -66)
+    scroll:SetPoint("TOPLEFT", guildDesc, "BOTTOMLEFT", -2, -12)
     scroll:SetPoint("BOTTOMRIGHT", -28, 10)
 
     local child = CreateFrame("Frame", nil, scroll)

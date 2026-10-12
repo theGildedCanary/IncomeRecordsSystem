@@ -18,7 +18,10 @@ The attached release ZIP is the packaged addon intended for installation. GitHub
 - Supports **Savings Projects** with targets, deadlines, funding sources, daily allocation splits, checkpoints, daily progress, and trajectory graphs. Changing a split affects future attributed source changes without reallocating gold already attributed to a project.
 - Supports **Reserve Funds** for balances you want to maintain rather than spend down.
 - Filters transfers between owned storage locations so moving your own gold does not count as profit or loss.
+- Includes the last-known balance of Guild Banks marked internal in Transfers in account gold, including the Micro Report's Total Gold and Account Liquid Gold funding sources.
 - Includes a floating **Mini Dashboard** for earnings, Savings Projects, and Reserve Funds.
+- Includes a movable **Micro Report** showing one gold amount. Enable it under **Settings > Toggles**, choose a display below its description, or right-click the report to change modes and optionally show a label. Position, visibility, and display mode are saved account-wide. Period earnings use net totals; session and profit-per-hour totals restart on login or UI reload.
+- Hover over the Micro Report for bank/account balances, token price, profit per hour, and Session/Daily/Weekly/Monthly Earned, Spent, and Net totals. Session totals reset on logout or UI reload. Older periods retain their net history but show Earned/Spent as unavailable; complete breakdowns start with newly tracked periods.
 - Tracks locally observed **WoW Token prices** and configurable market alerts.
 - Includes a **Profit Distribution Calculator** for splitting positive tracked profit across active Savings Projects and Reserve Funds.
 - Provides reports, font controls, window resizing, and per-character tracking.

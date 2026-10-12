@@ -223,6 +223,37 @@ miniAutoOpenCheck:SetScript("OnClick", function(self)
     IRS:SetSetting("autoOpenMiniDashboard", self:GetChecked())
 end)
 
+local microPanel = MakePanel(toggles, COLORS.panelAlt)
+microPanel:SetPoint("TOPLEFT", togglePanel, "BOTTOMLEFT", 0, -12)
+microPanel:SetPoint("TOPRIGHT", togglePanel, "BOTTOMRIGHT", 0, -12)
+microPanel:SetHeight(170)
+
+local microTitle = MakeText(microPanel, 13, COLORS.goldSoft, "LEFT")
+microTitle:SetPoint("TOPLEFT", 12, -12)
+microTitle:SetText("MICRO REPORT")
+
+local microCheck = CreateFrame("CheckButton", nil, microPanel, "UICheckButtonTemplate")
+microCheck:SetSize(30, 30)
+microCheck:SetPoint("TOPLEFT", microTitle, "BOTTOMLEFT", 0, -10)
+local microLabel = MakeText(microPanel, 12, COLORS.text, "LEFT")
+microLabel:SetPoint("LEFT", microCheck, "RIGHT", 8, 0)
+microLabel:SetText("Show Micro Report")
+microCheck:SetScript("OnClick", function(self)
+    IRS:SetMicroReportOption("shown", self:GetChecked())
+end)
+
+local microDesc = MakeText(microPanel, 8, COLORS.muted, "LEFT")
+microDesc:SetPoint("TOPLEFT", microCheck, "BOTTOMLEFT", 0, -6)
+microDesc:SetPoint("RIGHT", -12, 0)
+microDesc:SetText("One small, movable gold amount. Drag to position it anywhere on screen; right-click to change its display. Earnings are account-wide net totals; session and hourly totals reset on reload.")
+
+local microDisplay = CreateFrame("DropdownButton", nil, microPanel, "WowStyle1DropdownTemplate")
+microDisplay:SetWidth(250)
+microDisplay:SetPoint("TOPLEFT", microDesc, "BOTTOMLEFT", 0, -12)
+microDisplay:SetupMenu(function(_, root)
+    IRS:BuildMicroReportMenu(root)
+end)
+
 -- ============================================================================
 -- MINI DASHBOARD SECTION
 -- ============================================================================
@@ -665,6 +696,11 @@ local function LayoutSettingsForFonts()
     miniAutoOpenDesc:SetPoint("TOPLEFT", miniAutoOpenLabel, "BOTTOMLEFT", 0, -6)
     miniAutoOpenDesc:SetPoint("RIGHT", -12, 0)
 
+    microPanel:SetHeight(
+        microTitle:GetStringHeight() + 10 + 30 + 6
+        + microDesc:GetStringHeight() + 12 + microDisplay:GetHeight() + 26
+    )
+
     -- Mini Dashboard section.
     miniTogglePanel:ClearAllPoints()
     miniTogglePanel:SetPoint("TOPLEFT", miniDesc, "BOTTOMLEFT", -2, -14)
@@ -774,6 +810,8 @@ function IRS:RefreshSettingsPage()
 
     minimapCheck:SetChecked(IRS.db.settings.showMinimapButton ~= false)
     miniAutoOpenCheck:SetChecked(IRS.db.settings.autoOpenMiniDashboard == true)
+    microCheck:SetChecked(IRS:GetMicroReportSettings().shown == true)
+    microDisplay:GenerateMenu()
     miniProjectsCheck:SetChecked(IRS.db.settings.showMiniProjects ~= false)
     for _, choice in ipairs(miniStatChoices) do
         miniStatChecks[choice.key]:SetChecked(
