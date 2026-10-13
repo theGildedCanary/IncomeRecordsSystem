@@ -9,6 +9,7 @@
 # Core framework and data model
 Core\Core.lua
 Core\Formatting.lua
+Core\Contributors.lua
 UI\LayoutStyle.lua
 
 # Feature modules that must exist before the main UI is built

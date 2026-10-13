@@ -6,11 +6,21 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 
 ## [Unreleased]
 
+### Added
+
+- Added contributor acknowledgments for Lithevampy and Kraken Latte below Open IRS Dashboard in the addon options, and a Contributors page between Settings and Help in the IRS Dashboard.
+
 ## [1.3.1] - 2026-10-12
 
 ### Added
 
 - Added an account-wide Layout style selector under Settings > Fonts, with IRS Default and ElvUI Inspired appearances. The dark translucent style applies immediately to IRS windows, panels, and popups without requiring ElvUI.
+
+### Fixed
+
+- Fixed text overlap when increasing font sizes, with improved spacing, wrapping, and control sizing across IRS panels and floating displays.
+- Improved font formatting consistency for input fields and tooltips.
+- Hotfix: Raised and uniformly aligned the Reset Main and Reset Mini buttons in Settings > Fonts, and adjusted spacing to prevent overlap with description text at larger font sizes.
 
 ## [1.3.0] - 2026-10-12
 

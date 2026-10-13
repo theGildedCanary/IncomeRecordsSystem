@@ -48,6 +48,33 @@ openButton:SetScript("OnClick", function()
     IRS:ShowUI("dashboard")
 end)
 
+-- Contributor credits share their content with the dashboard page.
+local contributorsHeading = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+IRS:RegisterFontString("main", "section", contributorsHeading, STANDARD_TEXT_FONT, "")
+contributorsHeading:SetPoint("TOPLEFT", openButton, "BOTTOMLEFT", 0, -28)
+contributorsHeading:SetPoint("RIGHT", panel, "RIGHT", -24, 0)
+contributorsHeading:SetJustifyH("LEFT")
+contributorsHeading:SetWordWrap(true)
+contributorsHeading:SetText("Thank you to our Contributors")
+
+local contributorsThanks = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+IRS:RegisterFontString("main", "body", contributorsThanks, STANDARD_TEXT_FONT, "")
+contributorsThanks:SetPoint("TOPLEFT", contributorsHeading, "BOTTOMLEFT", 0, -12)
+contributorsThanks:SetPoint("RIGHT", panel, "RIGHT", -24, 0)
+contributorsThanks:SetJustifyH("LEFT")
+contributorsThanks:SetWordWrap(true)
+contributorsThanks:SetSpacing(2)
+contributorsThanks:SetText(IRS.contributorThanks)
+
+local contributorNames = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+IRS:RegisterFontString("main", "body", contributorNames, STANDARD_TEXT_FONT, "")
+contributorNames:SetPoint("TOPLEFT", contributorsThanks, "BOTTOMLEFT", 0, -16)
+contributorNames:SetPoint("RIGHT", panel, "RIGHT", -24, 0)
+contributorNames:SetJustifyH("LEFT")
+contributorNames:SetWordWrap(true)
+contributorNames:SetSpacing(8)
+contributorNames:SetText(table.concat(IRS.contributors, "\n"))
+
 -- category registration
 local category = Settings.RegisterCanvasLayoutCategory(
     panel,

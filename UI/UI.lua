@@ -199,12 +199,12 @@ close:SetPoint("TOPRIGHT", -8, -8)
 
 -- ============================================================================
 -- SECTION 2 — SIDEBAR NAVIGATION
--- Dashboard / Projects / Characters / Reports / Settings / Help.
+-- Dashboard / Projects / Characters / Reports / Settings / Contributors / Help.
 -- ============================================================================
 local rail = MakePanel(frame, COLORS.bg)
 rail:SetPoint("TOPLEFT", 14, -84)
 rail:SetPoint("BOTTOMLEFT", 14, 14)
-rail:SetWidth(104)
+rail:SetWidth(144)
 IRS:SetLayoutColor(rail, "SetBackdropBorderColor", 0, 0, 0, 0)
 rail.divider = rail:CreateTexture(nil, "BORDER")
 rail.divider:SetTexture("Interface/Buttons/WHITE8X8")
@@ -214,7 +214,7 @@ rail.divider:SetPoint("TOPRIGHT", -1, 0)
 rail.divider:SetPoint("BOTTOMRIGHT", -1, 0)
 
 local content = CreateFrame("Frame", nil, frame)
-content:SetPoint("TOPLEFT", 130, -84)
+content:SetPoint("TOPLEFT", rail, "TOPRIGHT", 12, 0)
 content:SetPoint("BOTTOMRIGHT", -16, 16)
 
 local pages, tabs = {}, {}
@@ -229,7 +229,8 @@ local function MakeTab(key, label, y)
     local button = CreateFrame("Button", nil, rail, "BackdropTemplate")
     IRS:StyleButtonFeedback(button)
     button:SetPoint("TOPLEFT", 4, y)
-    button:SetSize(96, 34)
+    button:SetPoint("TOPRIGHT", -4, y)
+    button:SetHeight(34)
     button:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8" })
     IRS:SetLayoutColor(button, "SetBackdropColor", 0, 0, 0, 0)
     IRS:SetLayoutColor(button, "SetBackdropBorderColor", 0, 0, 0, 0)
@@ -273,7 +274,8 @@ MakeTab("tools", "Tools", -122)
 MakeTab("characters", "Characters", -160)
 MakeTab("reports", "Reports", -198)
 MakeTab("settings", "Settings", -236)
-MakeTab("help", "Help", -274)
+MakeTab("contributors", "Contributors", -274)
+MakeTab("help", "Help", -312)
 
 -- ============================================================================
 -- SECTION 3 — DASHBOARD
@@ -2019,6 +2021,34 @@ settingsPage:SetAllPoints()
 pages.settings = settingsPage
 IRS.pageFrames.settings = settingsPage
 IRS.settingsPage = settingsPage
+
+-- Shared contributor credits, with flowing text to accommodate font changes.
+do
+local contributorsPage = CreateFrame("Frame", nil, content)
+contributorsPage:SetAllPoints()
+pages.contributors = contributorsPage
+IRS.pageFrames.contributors = contributorsPage
+
+local contributorsTitle = MakeText(contributorsPage, 19, COLORS.goldSoft, "LEFT")
+contributorsTitle:SetPoint("TOPLEFT", 4, -4)
+contributorsTitle:SetPoint("RIGHT", -4, 0)
+contributorsTitle:SetWordWrap(true)
+contributorsTitle:SetText("Thank you to our Contributors")
+
+local contributorsIntro = MakeText(contributorsPage, 11, COLORS.text, "LEFT")
+contributorsIntro:SetPoint("TOPLEFT", contributorsTitle, "BOTTOMLEFT", 0, -12)
+contributorsIntro:SetPoint("RIGHT", -4, 0)
+contributorsIntro:SetWordWrap(true)
+contributorsIntro:SetSpacing(2)
+contributorsIntro:SetText(IRS.contributorThanks)
+
+local contributorNames = MakeText(contributorsPage, 13, COLORS.goldSoft, "LEFT")
+contributorNames:SetPoint("TOPLEFT", contributorsIntro, "BOTTOMLEFT", 0, -24)
+contributorNames:SetPoint("RIGHT", -4, 0)
+contributorNames:SetWordWrap(true)
+contributorNames:SetSpacing(8)
+contributorNames:SetText(table.concat(IRS.contributors, "\n"))
+end
 
 -- ============================================================================
 -- SECTION 8 — HELP PAGE

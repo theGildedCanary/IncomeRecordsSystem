@@ -16,6 +16,7 @@ local PAGE_ORDER = {
     "characters",
     "reports",
     "settings",
+    "contributors",
     "help",
 }
 

@@ -725,7 +725,7 @@ mainFontDesc:SetText("Seven shared styles cover Dashboard, Projects, Characters,
 local resetMain = CreateFrame("Button", nil, mainFontPanel, "UIPanelButtonTemplate")
 IRS:StyleButtonFeedback(resetMain)
 resetMain:SetSize(118, 24)
-resetMain:SetPoint("TOPRIGHT", -12, -12)
+resetMain:SetPoint("TOPRIGHT", -12, -4)
 resetMain:SetText("Reset Main")
 resetMain:SetScript("OnClick", function()
     IRS:ResetFontSizes("main")
@@ -758,7 +758,7 @@ miniFontDesc:SetText("Five independent styles control the floating mini dashboar
 local resetMini = CreateFrame("Button", nil, miniFontPanel, "UIPanelButtonTemplate")
 IRS:StyleButtonFeedback(resetMini)
 resetMini:SetSize(118, 24)
-resetMini:SetPoint("TOPRIGHT", -12, -12)
+resetMini:SetPoint("TOPRIGHT", -12, -4)
 resetMini:SetText("Reset Mini")
 resetMini:SetScript("OnClick", function()
     IRS:ResetFontSizes("mini")
@@ -914,11 +914,14 @@ local function LayoutSettingsForFonts()
         {miniFontTitle, miniFontDesc, resetMini},
     }) do
         local title, description, reset = unpack(info)
-        title:SetWidth(math.max(1, (body:GetWidth() or 620) - 170))
-        description:ClearAllPoints()
-        description:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-        description:SetPoint("RIGHT", -12, 0)
         reset:SetHeight(math.max(24, labelSize + 12))
+        reset:ClearAllPoints()
+        reset:SetPoint("TOPRIGHT", -12, -4)
+        title:SetWidth(math.max(1, (body:GetWidth() or 620) - math.max(170, reset:GetWidth() + 36)))
+        description:ClearAllPoints()
+        local headerBottom = math.max(10 + title:GetStringHeight(), 4 + reset:GetHeight())
+        description:SetPoint("TOPLEFT", title:GetParent(), "TOPLEFT", 12, -(headerBottom + 6))
+        description:SetPoint("RIGHT", -12, 0)
     end
     mainFontPanel:ClearAllPoints()
     mainFontPanel:SetPoint("TOPLEFT", fontFaceSelect, "BOTTOMLEFT", -2, -16)
@@ -934,8 +937,8 @@ local function LayoutSettingsForFonts()
         end
     end
     local mainRowsPerColumn = 4
-    local mainControlsTop = 10 + mainFontTitle:GetStringHeight() + 6 + mainFontDesc:GetStringHeight() + 12
-    local miniControlsTop = 10 + miniFontTitle:GetStringHeight() + 6 + miniFontDesc:GetStringHeight() + 12
+    local mainControlsTop = math.max(10 + mainFontTitle:GetStringHeight(), 4 + resetMain:GetHeight()) + 6 + mainFontDesc:GetStringHeight() + 12
+    local miniControlsTop = math.max(10 + miniFontTitle:GetStringHeight(), 4 + resetMini:GetHeight()) + 6 + miniFontDesc:GetStringHeight() + 12
     local mainPanelHeight = mainControlsTop + (mainRowsPerColumn * fontControlRowHeight) + 14
     mainFontPanel:SetHeight(mainPanelHeight)
 
