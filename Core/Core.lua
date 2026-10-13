@@ -33,7 +33,7 @@ function IRS:StyleButtonFeedback(button)
     end
 end
 
-IRS.version = "0.17.3"
+IRS.version = C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version")
 
 -- ============================================================================
 -- TEMPORARY STARTUP TIMING DIAGNOSTICS
