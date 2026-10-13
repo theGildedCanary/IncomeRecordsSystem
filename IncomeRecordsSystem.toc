@@ -1,4 +1,4 @@
-## Interface: 120100
+## Interface: 120105
 ## Title: IRS — Income Records System
 ## Notes: IRS-themed account-wide gold earnings ledger for World of Warcraft Retail.
 ## Author: Gilded Canary
