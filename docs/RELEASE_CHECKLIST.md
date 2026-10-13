@@ -5,6 +5,9 @@ Use this checklist when preparing a new public release.
 ## Before Release
 
 - [ ] Finish and test the intended changes in World of Warcraft Retail.
+- [ ] Run `bash scripts/validate-addon.sh` with Lua 5.1 installed.
+- [ ] Run `python scripts/smoke-test.py` with Python and `lupa` installed for offline ledger, project, reserve, allocation, and transfer checks.
+- [ ] In game, verify Projects tab/action labels, switching between Management and Allocation, selecting/creating projects, and changing font sizes. Offline tests do not verify rendering or live Blizzard events.
 - [ ] Update `## Version:` in `IncomeRecordsSystem.toc`.
 - [ ] Move entries from **Unreleased** in `CHANGELOG.md` into a new version heading with the release date.
 - [ ] Add a fresh empty **Unreleased** section at the top of the changelog.

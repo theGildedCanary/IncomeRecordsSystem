@@ -560,7 +560,11 @@ local function MakeProjectButton(parent, text, x, y, w, onClick)
     IRS:SetLayoutColor(b, "SetBackdropColor", unpack(COLORS.panelAlt))
     IRS:SetLayoutColor(b, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
     b.label = MakeText(b, 9, COLORS.text, "CENTER")
-    b.label:SetAllPoints()
+    -- Keep a natural text height instead of stretching the glyph region across
+    -- the button; this also survives button reanchoring during font layout.
+    b.label:SetPoint("LEFT", b, "LEFT", 6, 0)
+    b.label:SetPoint("RIGHT", b, "RIGHT", -6, 0)
+    b.label:SetWordWrap(false)
     b.label:SetText(text)
     if onClick then b:SetScript("OnClick", onClick) end
     return b
@@ -1047,6 +1051,7 @@ end
 -- Copies a saved project's values into the editable form controls.
 local function LoadProjectIntoForm(project)
     deleteArmedId = nil; deleteProjectButton.label:SetText("DELETE")
+    projectStatus:SetText("")
     if not project then
         selectedProjectId = nil
         projectNameBox:SetText("")
@@ -2723,6 +2728,17 @@ function IRS:RefreshMainFontLayout()
         end
     end
 
+    -- Project tabs must reserve space for the selected font before positioning
+    -- the management/allocation content below them.
+    for _, button in ipairs({projectManagementTab, projectAllocationTab}) do
+        button:SetWidth(math.max(button == projectManagementTab and 170 or 116,
+            button.label:GetUnboundedStringWidth() + 20))
+        button:SetHeight(math.max(28, helper + 12))
+    end
+    projectTabsDivider:ClearAllPoints()
+    projectTabsDivider:SetPoint("TOPLEFT", projectManagementTab, "BOTTOMLEFT", 0, -6)
+    projectTabsDivider:SetPoint("RIGHT", projectsPage, "RIGHT", -4, 0)
+
     -- Keep wrapped field labels inside their columns and reserve the tallest
     -- label's height before placing the input and the next form row.
     projectSelectLabel:ClearAllPoints()
@@ -2731,10 +2747,13 @@ function IRS:RefreshMainFontLayout()
     projectSelect:ClearAllPoints()
     projectSelect:SetPoint("TOPLEFT", projectSelectLabel, "BOTTOMLEFT", 0, -6)
     projectSelect:SetHeight(selectHeight)
+    local previousProjectButton = projectSelect
     for i, button in ipairs({newProjectButton, deleteProjectButton, IRS.projectCheckpointsButton}) do
         button:ClearAllPoints()
-        button:SetPoint("TOPLEFT", projectSelect, "TOPLEFT", ({290, 412, 524})[i], 0)
+        button:SetWidth(math.max(({112, 100, 122})[i], button.label:GetUnboundedStringWidth() + 20))
+        button:SetPoint("TOPLEFT", previousProjectButton, "TOPRIGHT", 10, 0)
         button:SetHeight(selectHeight)
+        previousProjectButton = button
     end
     local projectFields = {projectNameBox, projectTargetBox, projectStartBox, projectDeadlineBox}
     local fieldLabelHeight = 0

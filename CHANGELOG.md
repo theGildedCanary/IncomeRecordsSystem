@@ -6,6 +6,13 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-10-13
+
+### Fixed
+
+- Reanchored Projects button labels with natural text height and no wrapping to address blank labels; project tabs and action buttons now reserve width for the selected font.
+- Positioned Projects content below the tab row as fonts change, and cleared stale selection warnings when loading a project.
+
 ### Added
 
 - Added contributor acknowledgments for Lithevampy and Kraken Latte below Open IRS Dashboard in the addon options, and a Contributors page between Settings and Help in the IRS Dashboard.
