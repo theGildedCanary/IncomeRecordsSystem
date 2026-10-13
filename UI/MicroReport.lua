@@ -6,7 +6,7 @@ local BACKGROUND = {0.165, 0.125, 0.085, 0.86}
 local BORDER = {0.52, 0.39, 0.22, 1}
 
 -- Keep the report's theme local; never recolor the shared game tooltip.
-local tooltip = CreateFrame("GameTooltip", "IncomeRecordsSystemMicroTooltip", UIParent, "GameTooltipTemplate,BackdropTemplate")
+local tooltip = IRS:CreateMicroTooltip()
 local function StyleTooltip()
     if tooltip.NineSlice then tooltip.NineSlice:Hide() end
     tooltip:SetBackdrop({bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 1})
@@ -17,7 +17,11 @@ tooltip:HookScript("OnShow", StyleTooltip)
 
 local function StyleMenuText(description, color)
     description:AddInitializer(function(button)
-        if button.fontString then button.fontString:SetTextColor(unpack(color)) end
+        if button.fontString then
+            button.fontString:SetFontObject(IRS:GetControlFont("main"))
+            button.fontString:SetTextColor(unpack(color))
+            button:SetHeight(math.max(button:GetHeight(), button.fontString:GetStringHeight() + 12))
+        end
         if button.leftTexture2 then button.leftTexture2:SetVertexColor(unpack(GOLD)) end
     end)
     return description
@@ -116,6 +120,7 @@ end
 
 local report = CreateFrame("Frame", "IncomeRecordsSystemMicroReport", UIParent, "BackdropTemplate")
 IRS.microReportFrame = report
+IRS:RegisterFormattingRoot(report, "main")
 report:SetSize(170, 28)
 report:SetPoint("CENTER", UIParent, "CENTER", 0, -180)
 report:SetFrameStrata("MEDIUM")
@@ -128,12 +133,16 @@ report:SetBackdropColor(0.165, 0.125, 0.085, 0.90)
 report:SetBackdropBorderColor(0.52, 0.39, 0.22, 1)
 report:Hide()
 local valueText = report:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-valueText:SetFont(STANDARD_TEXT_FONT, 12, "")
+IRS:RegisterFontString("main", "body", valueText, STANDARD_TEXT_FONT, "")
 valueText:SetPoint("CENTER")
 
-local function FormatCoins(value)
+local function FormatCoins(value, goldOnly)
     if value == nil then return "Unavailable" end
     local copper = math.floor(math.abs(value))
+    if goldOnly then
+        return (value < 0 and "-" or "") .. IRS:FormatCount(math.floor(copper / 10000))
+            .. "|TInterface/MoneyFrame/UI-GoldIcon:0:0:2:0|t"
+    end
     return (value < 0 and "-" or "") .. string.format(
         "%s|TInterface/MoneyFrame/UI-GoldIcon:0:0:2:0|t %d|TInterface/MoneyFrame/UI-SilverIcon:0:0:2:0|t %d|TInterface/MoneyFrame/UI-CopperIcon:0:0:2:0|t",
         IRS:FormatCount(math.floor(copper / 10000)), math.floor(copper / 100) % 100, copper % 100
@@ -142,6 +151,9 @@ end
 
 function IRS:RefreshMicroReport()
     local settings = self:GetMicroReportSettings()
+    -- Keep the amount consistent with the report's Body Text settings, including
+    -- reset and reload, before measuring the surrounding frame.
+    valueText:SetFont(IRS:GetFontFace(), IRS:GetFontSize("main", "body"), "")
     report:SetShown(settings.shown == true)
     if not report:IsShown() then return end
     local value = self:GetMicroReportValue()
@@ -150,6 +162,7 @@ function IRS:RefreshMicroReport()
     valueText:SetText(text)
     valueText:SetTextColor(0.88, 0.84, 0.75)
     report:SetWidth(math.max(110, valueText:GetStringWidth() + 24))
+    report:SetHeight(math.max(28, valueText:GetStringHeight() + 14))
 end
 
 function IRS:SetMicroReportOption(key, value)
@@ -181,6 +194,7 @@ end
 -- An IRS-owned popup uses exactly the tooltip's backdrop. There is no
 -- Blizzard menu artwork underneath it to make the brown fill look opaque.
 local contextMenu = CreateFrame("Frame", "IncomeRecordsSystemMicroMenu", UIParent, "BackdropTemplate")
+IRS:RegisterFormattingRoot(contextMenu, "main")
 contextMenu:SetSize(240, 38 + (#modes + 2) * 24 + 12)
 contextMenu:SetFrameStrata("FULLSCREEN_DIALOG")
 contextMenu:SetClampedToScreen(true)
@@ -192,6 +206,7 @@ contextMenu:Hide()
 table.insert(UISpecialFrames, "IncomeRecordsSystemMicroMenu")
 
 local menuTitle = contextMenu:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+IRS:RegisterFontString("main", "section", menuTitle, STANDARD_TEXT_FONT, "")
 menuTitle:SetPoint("TOPLEFT", 12, -12)
 menuTitle:SetText("IRS - Display Mode")
 menuTitle:SetTextColor(unpack(GOLD))
@@ -205,10 +220,12 @@ local function AddMenuRow(index, label, selected, action)
     highlight:SetAllPoints()
     highlight:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.16)
     row.label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    IRS:RegisterFontString("main", "body", row.label, STANDARD_TEXT_FONT, "")
     row.label:SetPoint("LEFT", 22, 0)
     row.label:SetText(label)
     row.label:SetTextColor(unpack(WHITE))
     row.mark = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    IRS:RegisterFontString("main", "body", row.mark, STANDARD_TEXT_FONT, "")
     row.mark:SetPoint("LEFT", 5, 0)
     row.mark:SetText("•")
     row.mark:SetTextColor(unpack(GOLD))
@@ -235,7 +252,29 @@ AddMenuRow(#modes + 2, "Reset Profit Per Hour", nil, function()
     IRS:RefreshMicroReport()
 end)
 
+local function LayoutMicroMenu()
+    local rowHeight = math.max(24, IRS:GetFontSize("main", "body") + 12)
+    local top = 12 + menuTitle:GetStringHeight() + 10
+    local width = math.max(240, menuTitle:GetStringWidth() + 24)
+    for i, row in ipairs(menuRows) do
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", 8, -top - (i - 1) * rowHeight)
+        row:SetPoint("TOPRIGHT", -8, -top - (i - 1) * rowHeight)
+        row:SetHeight(rowHeight)
+        width = math.max(width, row.label:GetStringWidth() + 46)
+    end
+    contextMenu:SetSize(width, top + #menuRows * rowHeight + 12)
+end
+
+-- Font settings already refresh the main UI. Resize the micro report and its
+-- popup in the same pass, including while their text is currently hidden.
+hooksecurefunc(IRS, "RefreshUI", function()
+    IRS:RefreshMicroReport()
+    LayoutMicroMenu()
+end)
+
 contextMenu:SetScript("OnShow", function(self)
+    LayoutMicroMenu()
     self:RegisterEvent("GLOBAL_MOUSE_DOWN")
     for _, row in ipairs(menuRows) do
         local selected = row.selected and row.selected()
@@ -257,7 +296,19 @@ contextMenu:SetScript("OnEvent", function(self)
     end
     self:Hide()
 end)
+local draggedMicroReport = false
+report:SetScript("OnMouseDown", function(_, button)
+    if button == "LeftButton" then draggedMicroReport = false end
+end)
 report:SetScript("OnMouseUp", function(self, button)
+    if button == "LeftButton" then
+        if not draggedMicroReport then
+            contextMenu:Hide()
+            tooltip:Hide()
+            IRS:ShowUI("dashboard")
+        end
+        return
+    end
     if button ~= "RightButton" then return end
     tooltip:Hide()
     if contextMenu:IsShown() then contextMenu:Hide(); return end
@@ -275,6 +326,7 @@ local function SavePosition()
     settings.point, settings.relativePoint, settings.x, settings.y = point, relativePoint, x, y
 end
 report:SetScript("OnDragStart", function(self)
+    draggedMicroReport = true
     contextMenu:Hide()
     tooltip:Hide()
     self:StartMoving()
@@ -287,10 +339,10 @@ report:SetScript("OnHide", function()
 end)
 local function RefreshTooltip()
     tooltip:SetText("IRS - " .. labels[IRS:GetMicroReportSettings().mode], unpack(GOLD))
-    tooltip:AddLine("Drag to move. Right-click to choose a display.", 0.88, 0.84, 0.75)
-    tooltip:AddLine("Periods cover the account. Session resets on logout or UI reload.", 0.68, 0.62, 0.51, true)
+    tooltip:AddLine("Left-click to open IRS. Drag to move. Right-click to choose a display.", 0.88, 0.84, 0.75, true, "helper")
+    tooltip:AddLine("Periods cover the account. Session resets on logout or UI reload.", 0.68, 0.62, 0.51, true, "helper")
     local function Row(label, value)
-        tooltip:AddDoubleLine(label, FormatCoins(value), GOLD[1], GOLD[2], GOLD[3], WHITE[1], WHITE[2], WHITE[3])
+        tooltip:AddDoubleLine(label, FormatCoins(value, true), GOLD[1], GOLD[2], GOLD[3], WHITE[1], WHITE[2], WHITE[3])
     end
     tooltip:AddLine(" ")
     Row("Warband Bank:", IRS.db.account.warbandGoldSeen and IRS.db.account.warbandGold or nil)
@@ -301,32 +353,28 @@ local function RefreshTooltip()
     tooltip:AddLine(" ")
     local duration = GetTime() - rateStarted
     Row("Profit Per Hour:", duration >= 1 and (sessionNet - rateBaseline) * 3600 / duration or 0)
-    local function Period(label, earned, spent, net, partial)
+    local function Period(label, earned, spent, net)
         tooltip:AddLine(" ")
-        local marker = partial and "*" or ""
-        Row(label .. " Earned" .. marker .. ":", earned)
-        Row(label .. " Spent" .. marker .. ":", spent)
+        Row(label .. " Earned:", earned)
+        Row(label .. " Spent:", spent)
         Row(label .. " Net:", net)
     end
     Period("Session", sessionEarned, sessionSpent, sessionNet)
     local day, week, month = IRS:GetPeriodKeys()
-    local incomplete = false
     for _, period in ipairs({
         {"Daily", "days", day},
         {"Weekly", "weeks", week},
         {"Monthly", "months", month},
     }) do
         local summary = IRS:GetPeriodFlowSummary(period[2], period[3])
-        incomplete = incomplete or not summary.complete
-        Period(period[1], summary.income, summary.expense, summary.net, not summary.complete)
-    end
-    if incomplete then
-        tooltip:AddLine(" ")
-        tooltip:AddLine("* Partial history: earned/spent include recorded amounts and keep updating. Net includes older history, so it may differ from earned minus spent.", 0.68, 0.62, 0.51, true)
+        Period(period[1], summary.income, summary.expense, summary.net)
     end
     tooltip:Show()
     StyleTooltip()
 end
+hooksecurefunc(IRS, "RefreshUI", function()
+    if tooltip:IsOwned(report) then RefreshTooltip() end
+end)
 report:SetScript("OnEnter", function(self)
     if contextMenu:IsShown() then return end
     tooltip:SetOwner(self, "ANCHOR_TOP")

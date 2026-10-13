@@ -503,6 +503,71 @@ fontsNote:SetPoint("TOPLEFT", 16, -56)
 fontsNote:SetPoint("RIGHT", -16, 0)
 fontsNote:SetText("Enter a size from 6–40, or use − / +. Reset buttons restore the IRS defaults.")
 
+local fontFaceLabel = MakeText(fonts, "body", COLORS.text, "LEFT")
+fontFaceLabel:SetText("Font for all IRS interfaces")
+local fontFaceSelect = CreateFrame("Button", nil, fonts, "BackdropTemplate")
+IRS:StyleButtonFeedback(fontFaceSelect)
+fontFaceSelect:SetBackdrop({bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 1})
+fontFaceSelect:SetBackdropColor(unpack(COLORS.panelAlt))
+fontFaceSelect:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+fontFaceSelect:SetWidth(280)
+fontFaceSelect.label = MakeText(fontFaceSelect, "body", COLORS.text, "LEFT")
+fontFaceSelect.label:SetPoint("LEFT", 10, 0)
+fontFaceSelect.label:SetPoint("RIGHT", -28, 0)
+local fontFaceArrow = MakeText(fontFaceSelect, "helper", COLORS.gold, "RIGHT")
+fontFaceArrow:SetPoint("RIGHT", -10, 0)
+fontFaceArrow:SetText("v")
+local fontFaceMenu = MakePanel(UIParent, COLORS.panel)
+IRS:RegisterFormattingRoot(fontFaceMenu, "main")
+fontFaceMenu:SetFrameStrata("FULLSCREEN_DIALOG")
+fontFaceMenu:SetClampedToScreen(true)
+fontFaceMenu:SetPoint("TOPLEFT", fontFaceSelect, "BOTTOMLEFT", 0, -2)
+fontFaceMenu:Hide()
+local fontFaceRows = {}
+for i, option in ipairs(IRS.FONT_FACE_OPTIONS) do
+    local key = option.key
+    local row = CreateFrame("Button", nil, fontFaceMenu)
+    row.label = MakeText(row, "body", COLORS.text, "LEFT")
+    row.label:SetPoint("LEFT", 10, 0)
+    row.label:SetText(option.label)
+    local highlight = row:CreateTexture(nil, "HIGHLIGHT")
+    highlight:SetAllPoints()
+    highlight:SetColorTexture(COLORS.gold[1], COLORS.gold[2], COLORS.gold[3], 0.16)
+    row:SetScript("OnClick", function()
+        fontFaceMenu:Hide()
+        IRS:SetFontFace(key)
+    end)
+    fontFaceRows[i] = row
+end
+fontFaceSelect:SetScript("OnClick", function()
+    local rowHeight = math.max(28, IRS:GetFontSize("main", "body") + 14)
+    local menuWidth = fontFaceSelect:GetWidth()
+    local _, _, selected = IRS:GetFontFace()
+    for i, row in ipairs(fontFaceRows) do
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", 4, -4 - (i - 1) * rowHeight)
+        row:SetPoint("TOPRIGHT", -4, -4 - (i - 1) * rowHeight)
+        row:SetHeight(rowHeight)
+        SetColor(row.label, IRS.FONT_FACE_OPTIONS[i].key == selected and COLORS.gold or COLORS.text)
+        menuWidth = math.max(menuWidth, row.label:GetStringWidth() + 28)
+    end
+    fontFaceMenu:SetSize(menuWidth, #fontFaceRows * rowHeight + 8)
+    fontFaceMenu:SetShown(not fontFaceMenu:IsShown())
+end)
+fonts:HookScript("OnHide", function() fontFaceMenu:Hide() end)
+fontFaceMenu:SetScript("OnShow", function(self) self:RegisterEvent("GLOBAL_MOUSE_DOWN") end)
+fontFaceMenu:SetScript("OnHide", function(self) self:UnregisterEvent("GLOBAL_MOUSE_DOWN") end)
+fontFaceMenu:SetScript("OnEvent", function(self)
+    for _, focus in ipairs(GetMouseFoci()) do
+        while focus do
+            if focus == self or focus == fontFaceSelect then return end
+            if focus.IsForbidden and focus:IsForbidden() then break end
+            focus = focus.GetParent and focus:GetParent() or nil
+        end
+    end
+    self:Hide()
+end)
+
 local fontControls = {
     main = {},
     mini = {},
@@ -543,6 +608,7 @@ local function MakeFontControl(parent, scope, styleKey, x, y, width)
     row.field:SetNumeric(true)
     row.field:SetMaxLetters(2)
     row.field:SetJustifyH("CENTER")
+    IRS:RegisterFontString("main", "body", row.field, STANDARD_TEXT_FONT, "")
     row.field.scope = scope
     row.field.styleKey = styleKey
 
@@ -622,7 +688,7 @@ miniFontTitle:SetText("MINI DASHBOARD")
 local miniFontDesc = MakeText(miniFontPanel, 8, COLORS.muted, "LEFT")
 miniFontDesc:SetPoint("TOPLEFT", 12, -32)
 miniFontDesc:SetPoint("RIGHT", -140, 0)
-miniFontDesc:SetText("Six independent styles control the floating mini dashboard only.")
+miniFontDesc:SetText("Five independent styles control the floating mini dashboard only.")
 
 local resetMini = CreateFrame("Button", nil, miniFontPanel, "UIPanelButtonTemplate")
 IRS:StyleButtonFeedback(resetMini)
@@ -760,13 +826,44 @@ local function LayoutSettingsForFonts()
     projectScroll:SetPoint("BOTTOMRIGHT", -28, 10)
 
     -- Font editor itself.
+    fontsNote:ClearAllPoints()
+    fontsNote:SetPoint("TOPLEFT", fontsDesc, "BOTTOMLEFT", 0, -8)
+    fontsNote:SetPoint("RIGHT", -16, 0)
+    fontFaceLabel:ClearAllPoints()
+    fontFaceLabel:SetPoint("TOPLEFT", fontsNote, "BOTTOMLEFT", 0, -12)
+    fontFaceLabel:SetPoint("RIGHT", -16, 0)
+    fontFaceSelect:ClearAllPoints()
+    fontFaceSelect:SetPoint("TOPLEFT", fontFaceLabel, "BOTTOMLEFT", 0, -8)
+    fontFaceSelect:SetHeight(math.max(28, bodySize + 14))
+
+    for _, info in ipairs({
+        {mainFontTitle, mainFontDesc, resetMain},
+        {miniFontTitle, miniFontDesc, resetMini},
+    }) do
+        local title, description, reset = unpack(info)
+        title:SetWidth(math.max(1, (body:GetWidth() or 620) - 170))
+        description:ClearAllPoints()
+        description:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+        description:SetPoint("RIGHT", -12, 0)
+        reset:SetHeight(math.max(24, labelSize + 12))
+    end
     mainFontPanel:ClearAllPoints()
-    mainFontPanel:SetPoint("TOPLEFT", fontsNote, "BOTTOMLEFT", -2, -16)
+    mainFontPanel:SetPoint("TOPLEFT", fontFaceSelect, "BOTTOMLEFT", -2, -16)
     mainFontPanel:SetPoint("TOPRIGHT", fonts, "TOPRIGHT", -14, 0)
 
-    local fontControlRowHeight = math.max(30, bodySize + 14)
+    local fontControlRowHeight = math.max(30, math.max(bodySize, labelSize) + 14)
+    for _, controls in pairs(fontControls) do
+        for _, control in pairs(controls) do
+            fontControlRowHeight = math.max(fontControlRowHeight, control.label:GetStringHeight() + 12)
+            control.minus:SetHeight(math.max(24, labelSize + 12))
+            control.plus:SetHeight(math.max(24, labelSize + 12))
+            control.field:SetHeight(math.max(24, bodySize + 12))
+        end
+    end
     local mainRowsPerColumn = 4
-    local mainPanelHeight = 62 + (mainRowsPerColumn * fontControlRowHeight) + 14
+    local mainControlsTop = 10 + mainFontTitle:GetStringHeight() + 6 + mainFontDesc:GetStringHeight() + 12
+    local miniControlsTop = 10 + miniFontTitle:GetStringHeight() + 6 + miniFontDesc:GetStringHeight() + 12
+    local mainPanelHeight = mainControlsTop + (mainRowsPerColumn * fontControlRowHeight) + 14
     mainFontPanel:SetHeight(mainPanelHeight)
 
     for i, styleKey in ipairs(mainKeys) do
@@ -779,13 +876,14 @@ local function LayoutSettingsForFonts()
         control:SetPoint(
             "TOPLEFT",
             column == 1 and 14 or 315,
-            -62 - ((rowIndex - 1) * fontControlRowHeight)
+            -mainControlsTop - ((rowIndex - 1) * fontControlRowHeight)
         )
     end
 
     miniFontPanel:ClearAllPoints()
     miniFontPanel:SetPoint("TOPLEFT", mainFontPanel, "BOTTOMLEFT", 0, -12)
-    miniFontPanel:SetPoint("BOTTOMRIGHT", fonts, "BOTTOMRIGHT", -14, 14)
+    miniFontPanel:SetPoint("RIGHT", fonts, "RIGHT", -14, 0)
+    miniFontPanel:SetHeight(miniControlsTop + (3 * fontControlRowHeight) + 14)
 
     local miniRowsPerColumn = 3
     for i, styleKey in ipairs(miniKeys) do
@@ -798,7 +896,7 @@ local function LayoutSettingsForFonts()
         control:SetPoint(
             "TOPLEFT",
             column == 1 and 14 or 315,
-            -62 - ((rowIndex - 1) * fontControlRowHeight)
+            -miniControlsTop - ((rowIndex - 1) * fontControlRowHeight)
         )
     end
 end
@@ -807,6 +905,8 @@ function IRS:RefreshSettingsPage()
     if not IRS.db then return end
 
     LayoutSettingsForFonts()
+    local _, fontFaceName = IRS:GetFontFace()
+    fontFaceSelect.label:SetText(fontFaceName)
 
     minimapCheck:SetChecked(IRS.db.settings.showMinimapButton ~= false)
     miniAutoOpenCheck:SetChecked(IRS.db.settings.autoOpenMiniDashboard == true)

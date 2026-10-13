@@ -234,13 +234,12 @@ IRS.FONT_STYLE_DEFAULTS = {
         heading = 13,
         heading2 = 12,
         heading3 = 11,
-        value = 12,
     },
 }
 
 IRS.FONT_STYLE_ORDER = {
     main = {"helper", "body", "label", "section", "page", "value", "brand"},
-    mini = {"helper", "body", "heading", "heading2", "heading3", "value"},
+    mini = {"helper", "body", "heading", "heading2", "heading3"},
 }
 
 IRS.FONT_STYLE_LABELS = {
@@ -259,7 +258,6 @@ IRS.FONT_STYLE_LABELS = {
         heading = "Headings",
         heading2 = "Headings 2",
         heading3 = "Headings 3",
-        value = "Key Values",
     },
 }
 
@@ -285,12 +283,20 @@ IRS.FONT_STYLE_LEGACY_MAP = {
         ["8"] = "helper",
         ["10"] = "body",
         ["11"] = "body",
-        ["12"] = "value",
+        ["12"] = "body",
         ["13"] = "heading",
     },
 }
 
 -- Runtime references to FontStrings. This is not SavedVariables data.
+IRS.DEFAULT_FONT_FACE = [[Interface\AddOns\IncomeRecordsSystem\Media\fonts\2002b.ttf]]
+IRS.FONT_FACE_OPTIONS = {
+    {key = "default", label = "Default (2002 Bold)", path = IRS.DEFAULT_FONT_FACE},
+    {key = "2002", label = "2002", path = [[Interface\AddOns\IncomeRecordsSystem\Media\fonts\2002.ttf]]},
+    {key = "arial", label = "Arial Narrow", path = [[Fonts\ARIALN.TTF]]},
+    {key = "morpheus", label = "Morpheus", path = [[Fonts\MORPHEUS.TTF]]},
+}
+
 IRS._fontRegistry = IRS._fontRegistry or {
     main = {},
     mini = {},
@@ -3862,12 +3868,38 @@ function IRS:GetFontSize(scope, styleKey)
 end
 
 -- Registers a FontString so a style change updates every matching text element.
+function IRS:GetFontFace()
+    if not IRS.db then IRS:EnsureDB() end
+    local selected = IRS.db.settings.fontFace or "default"
+    for _, option in ipairs(IRS.FONT_FACE_OPTIONS) do
+        if option.key == selected then return option.path, option.label, option.key end
+    end
+    return IRS.DEFAULT_FONT_FACE, "Default (2002 Bold)", "default"
+end
+
+local function ApplyFontFace(fontString, fallbackPath, size, flags)
+    local path = IRS:GetFontFace()
+    -- FontStrings do not return success from SetFont (EditBoxes do). Checking
+    -- its return value would immediately replace a successfully applied face.
+    fontString:SetFont(path, size, flags or "")
+    local appliedPath = fontString:GetFont()
+    local function NormalizeFontPath(value)
+        return tostring(value or ""):lower():gsub("/", "\\")
+    end
+    if NormalizeFontPath(appliedPath) ~= NormalizeFontPath(path) then
+        fontString:SetFont(fallbackPath or STANDARD_TEXT_FONT, size, flags or "")
+    end
+end
+
 function IRS:RegisterFontString(scope, styleKey, fontString, fontPath, flags)
     if not fontString then return end
 
     scope = scope == "mini" and "mini" or "main"
     local key = IRS:ResolveFontStyle(scope, styleKey)
     if not key then return end
+    IRS._registeredFontObjects = IRS._registeredFontObjects or setmetatable({}, {__mode = "k"})
+    if IRS._registeredFontObjects[fontString] then return end
+    IRS._registeredFontObjects[fontString] = {scope = scope, style = key}
 
     IRS._fontRegistry[scope] = IRS._fontRegistry[scope] or {}
     IRS._fontRegistry[scope][key] = IRS._fontRegistry[scope][key] or {}
@@ -3878,11 +3910,7 @@ function IRS:RegisterFontString(scope, styleKey, fontString, fontPath, flags)
         flags = flags or "",
     })
 
-    fontString:SetFont(
-        fontPath or STANDARD_TEXT_FONT,
-        IRS:GetFontSize(scope, key),
-        flags or ""
-    )
+    ApplyFontFace(fontString, fontPath, IRS:GetFontSize(scope, key), flags)
 end
 
 local function ApplyRegisteredFontStyle(scope, styleKey)
@@ -3898,13 +3926,35 @@ local function ApplyRegisteredFontStyle(scope, styleKey)
         or {}
     ) do
         if entry.fontString then
-            entry.fontString:SetFont(
-                entry.fontPath or STANDARD_TEXT_FONT,
-                size,
-                entry.flags or ""
-            )
+            ApplyFontFace(entry.fontString, entry.fontPath, size, entry.flags)
         end
     end
+end
+
+-- UI files can create text before SavedVariables are restored. Reapply the
+-- loaded preferences to those existing FontStrings before measuring layout.
+function IRS:ApplySavedFontSizes()
+    if IRS.RefreshFormattingCoverage then IRS:RefreshFormattingCoverage() end
+    for scope, defaults in pairs(IRS.FONT_STYLE_DEFAULTS) do
+        for styleKey in pairs(defaults) do
+            ApplyRegisteredFontStyle(scope, styleKey)
+        end
+    end
+end
+
+function IRS:SetFontFace(selected)
+    local valid = false
+    for _, option in ipairs(IRS.FONT_FACE_OPTIONS) do
+        if option.key == selected then valid = true; break end
+    end
+    if not valid then return false end
+    if not IRS.db then IRS:EnsureDB() end
+    IRS.db.settings.fontFace = selected
+    IRS:ApplySavedFontSizes()
+    if IRS.RefreshUI then IRS:RefreshUI() end
+    if IRS.RefreshMiniDashboard then IRS:RefreshMiniDashboard() end
+    if IRS.RefreshAllPageScrolls then IRS:RefreshAllPageScrolls() end
+    return true
 end
 
 -- Changes one shared semantic style.
@@ -3921,6 +3971,7 @@ function IRS:SetFontSize(scope, styleKey, value)
     value = math.max(6, math.min(40, value))
 
     IRS.db.settings.fontSizes[scope][key] = value
+    if IRS.RefreshFormattingCoverage then IRS:RefreshFormattingCoverage() end
     ApplyRegisteredFontStyle(scope, key)
 
     if scope == "main" then
@@ -4007,6 +4058,19 @@ end
 
 -- Converts an internal copper value into readable gold/silver/copper text.
 -- Supports negative values because IRS tracks net profit/loss.
+-- Editable gold amounts must round-trip all copper, even when report labels
+-- display only whole gold. Four decimal places in gold represent one copper.
+function IRS:FormatGoldInput(copper)
+    local value = math.floor(tonumber(copper) or 0)
+    local sign = value < 0 and "-" or ""
+    value = math.abs(value)
+    local gold, remainder = math.floor(value / 10000), value % 10000
+    if remainder == 0 then return sign .. string.format("%.0f", gold) end
+    local text = string.format("%s%.0f.%04d", sign, gold, remainder)
+    text = text:gsub("0+$", "")
+    return text
+end
+
 function IRS:FormatMoney(copper, compact)
     copper = math.floor(tonumber(copper) or 0)
     local negative = copper < 0
@@ -4129,6 +4193,7 @@ end
 eventFrame:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
         IRS:EnsureDB()
+        IRS:ApplySavedFontSizes()
 
         local minimapTiming = IRS:BeginStartupTiming("Minimap button refresh")
         if IRS.RefreshMinimapButton then IRS:RefreshMinimapButton() end
@@ -4137,6 +4202,8 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
     end
 
     if event == "PLAYER_LOGIN" then
+        -- Include any interfaces constructed during ADDON_LOADED callbacks.
+        IRS:ApplySavedFontSizes()
         IRS:ScheduleStartupTimingFinish(4.0)
         loginScanPending = true
 

@@ -84,7 +84,7 @@ local function ParseGoldInput(text)
 end
 
 local function GoldEditText(copper)
-    return tostring(math.floor((tonumber(copper) or 0) / 10000))
+    return IRS:FormatGoldInput(copper)
 end
 
 local manager = MakePanel(parent)

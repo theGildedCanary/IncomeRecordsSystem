@@ -825,14 +825,15 @@ local function EnsureDistRow(index)
 
     row:SetScript("OnEnter", function(self)
         if not self.data then return end
-        GameTooltip:SetOwner(self,"ANCHOR_RIGHT")
-        GameTooltip:SetText(self.data.name or "Savings Project")
-        GameTooltip:AddLine("Distribution: "..PercentText(self.data.weight),0.88,0.84,0.75)
-        GameTooltip:AddLine("Split of total profit: "..PercentText(self.data.splitPercent),0.88,0.84,0.75)
-        GameTooltip:AddLine("Suggested: "..WholeGold(self.data.suggested or 0),0.86,0.71,0.36)
-        GameTooltip:Show()
+        IRS.tooltip:SetOwner(self,"ANCHOR_RIGHT")
+        IRS.tooltip:SetText(self.data.name or "Savings Project")
+        IRS.tooltip:AddLine("Distribution: "..PercentText(self.data.weight),0.88,0.84,0.75)
+        IRS.tooltip:AddLine("Split of total profit: "..PercentText(self.data.splitPercent),0.88,0.84,0.75)
+        IRS.tooltip:AddLine("Suggested: "..WholeGold(self.data.suggested or 0),0.86,0.71,0.36)
+        IRS:FormatTooltip(IRS.tooltip, "main")
+        IRS.tooltip:Show()
     end)
-    row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    row:SetScript("OnLeave", function() IRS.tooltip:Hide() end)
     distRows[index]=row
     return row
 end
@@ -857,6 +858,7 @@ reservePercentLabel:SetPoint("RIGHT",-330,10); reservePercentLabel:SetText("RESE
 local reserveInput=CreateFrame("EditBox",nil,reservePanel,"InputBoxTemplate")
 reserveInput:SetSize(62,24); reserveInput:SetPoint("LEFT",reservePercentLabel,"RIGHT",8,0)
 reserveInput:SetAutoFocus(false); reserveInput:SetJustifyH("RIGHT"); reserveInput:SetFontObject(GameFontHighlightSmall)
+IRS:RegisterFontString("main", "body", reserveInput, STANDARD_TEXT_FONT, "")
 reserveInput:SetMaxLetters(5); reserveInput:SetNumeric(false)
 local reserveSplit=MakeText(reservePanel,"body",COLORS.text,"RIGHT")
 reserveSplit:SetPoint("RIGHT",-145,10); reserveSplit:SetWidth(105)
@@ -867,6 +869,42 @@ local footerLine=MakeText(distributionView,"body",COLORS.text,"LEFT")
 footerLine:SetPoint("TOPLEFT",reservePanel,"BOTTOMLEFT",0,-10); footerLine:SetPoint("TOPRIGHT",-4,-10)
 local footerHint=MakeText(distributionView,"helper",COLORS.muted,"LEFT")
 footerHint:SetPoint("TOPLEFT",footerLine,"BOTTOMLEFT",0,-5); footerHint:SetPoint("TOPRIGHT",-4,-5); footerHint:SetWordWrap(true)
+
+local function LayoutReserveAllocation()
+    -- Keep the explanation above the controls, with bounded columns below it.
+    -- The panel grows to contain wrapped text instead of sharing a fixed row.
+    local width = math.max(1, reservePanel:GetWidth() - 20)
+    reserveTitle:SetWidth(width)
+    reserveDetail:SetWidth(width)
+    reserveDetail:SetWordWrap(true)
+    local inputHeight = math.max(24, IRS:GetFontSize("main", "body") + 12)
+    local inputWidth = math.max(62, IRS:GetFontSize("main", "body") * 3 + 16)
+    local columnWidth = math.max(1, (width - 24) / 3)
+    -- Stack the percentage label above its input so both remain readable even
+    -- when the label wraps or the input uses a larger font.
+    reservePercentLabel:ClearAllPoints()
+    reservePercentLabel:SetPoint("TOPLEFT", reserveDetail, "BOTTOMLEFT", 0, -14)
+    reservePercentLabel:SetWidth(columnWidth)
+    reservePercentLabel:SetJustifyH("LEFT")
+    reservePercentLabel:SetWordWrap(true)
+    reserveInput:ClearAllPoints()
+    reserveInput:SetPoint("TOPLEFT", reservePercentLabel, "BOTTOMLEFT", 2, -8)
+    reserveInput:SetSize(math.min(inputWidth, columnWidth - 4), inputHeight)
+    for i, text in ipairs({reserveSplit, reserveSuggested}) do
+        text:ClearAllPoints()
+        text:SetPoint("TOPLEFT", reservePercentLabel, "TOPLEFT", i * (columnWidth + 12), 0)
+        text:SetWidth(columnWidth)
+        text:SetWordWrap(true)
+        text:SetJustifyH("RIGHT")
+    end
+    local controlsHeight = math.max(
+        reservePercentLabel:GetStringHeight() + 8 + inputHeight,
+        reserveSplit:GetStringHeight(), reserveSuggested:GetStringHeight()
+    )
+    reservePanel:SetHeight(9 + reserveTitle:GetStringHeight() + 4
+        + reserveDetail:GetStringHeight() + 14 + controlsHeight + 12)
+    footerLine:SetWordWrap(true)
+end
 
 local function CommitReservePercent(self)
     local raw=tostring(self:GetText() or ""):gsub("%%","")
@@ -957,6 +995,7 @@ end)
 function IRS:RefreshToolsLayout()
     LayoutManual()
     LayoutDistributionColumns()
+    LayoutReserveAllocation()
 end
 
 function IRS:RefreshToolsPage()
@@ -1027,6 +1066,7 @@ function IRS:RefreshProjectAllocationPage()
         data.totalWeight or 0,data.projectPoolPercent or 0,data.reservePercent or 0
     ))
     LayoutDistributionColumns()
+    LayoutReserveAllocation()
 end
 
 IRS:RefreshToolsLayout()

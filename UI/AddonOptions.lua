@@ -1,10 +1,12 @@
 local IRS = IRS
 
 local panel = CreateFrame("Frame")
+IRS:RegisterFormattingRoot(panel, "main")
 panel.name = "IRS  Income Records System"
 
 -- Title Display
 local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+IRS:RegisterFontString("main", "page", title, STANDARD_TEXT_FONT, "")
 title:SetPoint("TOPLEFT", 24, -24)
 title:SetText("IRS – Income Records System")
 
@@ -15,12 +17,14 @@ local version = C_AddOns.GetAddOnMetadata(
 ) or "Unknown"
 
 local versionText = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+IRS:RegisterFontString("main", "helper", versionText, STANDARD_TEXT_FONT, "")
 versionText:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
 versionText:SetTextColor(0.65, 0.65, 0.65)
 versionText:SetText("Version: " .. version)
 
 -- Description Display
 local description = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+IRS:RegisterFontString("main", "body", description, STANDARD_TEXT_FONT, "")
 description:SetPoint("TOPLEFT", versionText, "BOTTOMLEFT", 0, -8)
 description:SetWidth(620)
 description:SetJustifyH("LEFT")

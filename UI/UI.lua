@@ -145,6 +145,7 @@ frame:SetBackdropColor(unpack(COLORS.bg))
 frame:SetBackdropBorderColor(unpack(COLORS.border))
 frame:Hide()
 IRS.mainFrame = frame
+IRS:RegisterFormattingRoot(frame, "main")
 
 if UISpecialFrames then
     local found = false
@@ -625,11 +626,15 @@ local function MakeProjectEdit(parent, labelText, x, y, w)
     local label = MakeText(parent, 9, COLORS.muted, "LEFT")
     label:SetPoint("TOPLEFT", x, y)
     label:SetText(labelText)
+    label:SetWidth(w)
+    label:SetWordWrap(true)
     local box = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
     box:SetPoint("TOPLEFT", x + 2, y - 16)
     box:SetSize(w, 25)
     box:SetAutoFocus(false)
     box:SetFontObject(GameFontHighlightSmall)
+    IRS:RegisterFontString("main", "body", box, STANDARD_TEXT_FONT, "")
+    box.label = label
     return box, label
 end
 
@@ -648,8 +653,7 @@ end
 
 -- Converts project copper back into simple editable gold text.
 local function GoldInputText(copper)
-    local gold = math.floor((tonumber(copper) or 0) / 10000)
-    return tostring(gold)
+    return IRS:FormatGoldInput(copper)
 end
 
 local projectSelectLabel = MakeText(projectManagementView, 9, COLORS.muted, "LEFT")
@@ -1930,33 +1934,33 @@ local function EnsureTransactionRow(index)
         local event = self.transactionEvent
         if not event then return end
 
-        GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
-        GameTooltip:AddLine("IRS Transaction", 0.86, 0.71, 0.36)
-        GameTooltip:AddDoubleLine(
+        IRS.tooltip:SetOwner(self, "ANCHOR_CURSOR")
+        IRS.tooltip:AddLine("IRS Transaction", 0.86, 0.71, 0.36)
+        IRS.tooltip:AddDoubleLine(
             "Character",
             event.characterLabel or "Unknown",
             0.68, 0.62, 0.51,
             0.88, 0.84, 0.75
         )
-        GameTooltip:AddDoubleLine(
+        IRS.tooltip:AddDoubleLine(
             "Wallet before",
             FormatGold(event.walletBefore or 0, true)
         )
-        GameTooltip:AddDoubleLine(
+        IRS.tooltip:AddDoubleLine(
             "Wallet after",
             FormatGold(event.walletAfter or 0, true)
         )
-        GameTooltip:AddDoubleLine(
+        IRS.tooltip:AddDoubleLine(
             "Raw wallet change",
             FormatGold(event.rawDelta or 0, true)
         )
-        GameTooltip:AddDoubleLine(
+        IRS.tooltip:AddDoubleLine(
             "Applied to IRS",
             FormatGold(event.ledgerAmount or 0, true)
         )
 
         if (tonumber(event.internalAmount) or 0) > 0 then
-            GameTooltip:AddDoubleLine(
+            IRS.tooltip:AddDoubleLine(
                 "Internal transfer",
                 FormatGold(event.internalAmount or 0, true)
             )
@@ -1979,24 +1983,25 @@ local function EnsureTransactionRow(index)
             elseif event.toType == "character" then
                 toText = "Character"
             end
-            GameTooltip:AddDoubleLine("Movement", fromText .. " → " .. toText)
+            IRS.tooltip:AddDoubleLine("Movement", fromText .. " → " .. toText)
         end
 
-        GameTooltip:AddDoubleLine(
+        IRS.tooltip:AddDoubleLine(
             "Reason",
             tostring(event.reason or "Unknown")
         )
         if event.corrected then
-            GameTooltip:AddLine(
+            IRS.tooltip:AddLine(
                 "A late storage match corrected the original ledger effect.",
                 0.43, 0.60, 0.36,
                 true
             )
         end
-        GameTooltip:Show()
+        IRS:FormatTooltip(IRS.tooltip, "main")
+        IRS.tooltip:Show()
     end)
     row:SetScript("OnLeave", function()
-        GameTooltip:Hide()
+        IRS.tooltip:Hide()
     end)
 
     transactionView.rows[index] = row
@@ -2041,6 +2046,8 @@ helpHeading:SetPoint("TOPLEFT", 14, -13); helpHeading:SetText("COMMANDS")
 local helpText = MakeText(helpCommands, 11, COLORS.text, "LEFT")
 helpText:SetPoint("TOPLEFT", 14, -44); helpText:SetPoint("RIGHT", -14, 0)
 helpText:SetWordWrap(true)
+helpText:SetSpacing(2)
+helpIntro:SetSpacing(2)
 helpText:SetText("/irs — toggle the IRS window\n\n/irs mini — toggle the floating mini dashboard\n\n/irs projects — open Savings Projects\n\n/irs reserves — open Reserve Funds\n\n/irs chars — open Characters\n\n/irs reports — open Reports\n\n/irs transactions — print recent transaction log\n\n/irs settings — open Settings\n\n/irs help — open this page\n\n/irs scan — rescan the current character\n\n/irs status — print current net periods to chat")
 
 local function LayoutHelpCommands()
@@ -2686,6 +2693,50 @@ function IRS:RefreshMainFontLayout()
         end
     end
 
+    -- Keep wrapped field labels inside their columns and reserve the tallest
+    -- label's height before placing the input and the next form row.
+    projectSelectLabel:ClearAllPoints()
+    projectSelectLabel:SetPoint("TOPLEFT", projectManagementDesc, "BOTTOMLEFT", 0, -16)
+    local selectHeight = math.max(28, labelSize + 12)
+    projectSelect:ClearAllPoints()
+    projectSelect:SetPoint("TOPLEFT", projectSelectLabel, "BOTTOMLEFT", 0, -6)
+    projectSelect:SetHeight(selectHeight)
+    for i, button in ipairs({newProjectButton, deleteProjectButton, IRS.projectCheckpointsButton}) do
+        button:ClearAllPoints()
+        button:SetPoint("TOPLEFT", projectSelect, "TOPLEFT", ({290, 412, 524})[i], 0)
+        button:SetHeight(selectHeight)
+    end
+    local projectFields = {projectNameBox, projectTargetBox, projectStartBox, projectDeadlineBox}
+    local fieldLabelHeight = 0
+    for i, box in ipairs(projectFields) do
+        box.label:ClearAllPoints()
+        box.label:SetPoint("TOPLEFT", projectSelect, "BOTTOMLEFT", ({0, 215, 355, 510})[i], -16)
+        fieldLabelHeight = math.max(fieldLabelHeight, box.label:GetStringHeight())
+    end
+    local inputHeight = math.max(25, body + 12)
+    for _, box in ipairs(projectFields) do
+        box:ClearAllPoints()
+        box:SetPoint("TOPLEFT", box.label, "TOPLEFT", 2, -(fieldLabelHeight + 6))
+        box:SetHeight(inputHeight)
+    end
+    sourceLabel:ClearAllPoints()
+    sourceLabel:SetPoint("TOPLEFT", projectNameBox, "BOTTOMLEFT", -2, -16)
+    sourceDetailLabel:ClearAllPoints()
+    sourceDetailLabel:SetPoint("TOPLEFT", sourceLabel, "TOPLEFT", 190, 0)
+    local sourceHeight = math.max(sourceLabel:GetStringHeight(), sourceDetailLabel:GetStringHeight())
+    for _, item in ipairs({{sourceButton, 4}, {sourceDetailButton, 194}, {saveProjectButton, 479}, {syncGuildButton, 609}}) do
+        item[1]:ClearAllPoints()
+        item[1]:SetPoint("TOPLEFT", sourceLabel, "TOPLEFT", item[2] - 4, -(sourceHeight + 6))
+        item[1]:SetHeight(math.max(28, labelSize + 12))
+    end
+    -- A full-width note avoids the narrow sliver beside the action buttons.
+    formNote:ClearAllPoints()
+    formNote:SetPoint("TOPLEFT", sourceButton, "BOTTOMLEFT", 0, -10)
+    formNote:SetPoint("RIGHT", projectManagementView, "RIGHT", -4, 0)
+    projectSummary:ClearAllPoints()
+    projectSummary:SetPoint("TOPLEFT", formNote, "BOTTOMLEFT", 0, -16)
+    projectSummary:SetPoint("RIGHT", projectManagementView, "RIGHT", -4, 0)
+
     -- PROJECTS: summary cards grow vertically with their three text tiers.
     local summaryCardHeight = math.max(
         67,
@@ -3029,13 +3080,14 @@ minimapButton:SetScript("OnClick", function(_, button)
     end
 end)
 minimapButton:SetScript("OnEnter", function(self)
-    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:SetText("IRS — Income Records System", 1.0, 0.76, 0.28)
-    GameTooltip:AddLine("Left-click: open or close IRS.", 0.9, 0.88, 0.81)
-    GameTooltip:AddLine("Right-click: toggle mini dashboard.", 0.9, 0.88, 0.81)
-    GameTooltip:Show()
+    IRS.tooltip:SetOwner(self, "ANCHOR_LEFT")
+    IRS.tooltip:SetText("IRS — Income Records System", 1.0, 0.76, 0.28)
+    IRS.tooltip:AddLine("Left-click: open or close IRS.", 0.9, 0.88, 0.81)
+    IRS.tooltip:AddLine("Right-click: toggle mini dashboard.", 0.9, 0.88, 0.81)
+    IRS:FormatTooltip(IRS.tooltip, "main")
+    IRS.tooltip:Show()
 end)
-minimapButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+minimapButton:SetScript("OnLeave", function() IRS.tooltip:Hide() end)
 
 -- Shows or hides the minimap button according to the saved Settings checkbox.
 function IRS:RefreshMinimapButton()

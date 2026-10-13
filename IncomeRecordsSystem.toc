@@ -8,6 +8,7 @@
 
 # Core framework and data model
 Core\Core.lua
+Core\Formatting.lua
 
 # Feature modules that must exist before the main UI is built
 Features\Transfers.lua
@@ -24,6 +25,7 @@ Features\Reserves.lua
 Features\Tools.lua
 
 # Supporting UI modules
+UI\MicroTooltip.lua
 UI\MicroReport.lua
 UI\Settings.lua
 UI\MiniDashboard.lua

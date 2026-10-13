@@ -146,14 +146,14 @@ local function FormatAggregateTargetLine(summary)
 
     if difference > 0 then
         return INLINE_GOLD .. target .. INLINE_RESET
-            .. "  " .. INLINE_GREEN .. "(Over +" .. FormatGold(difference) .. ")" .. INLINE_RESET
+            .. "\n" .. INLINE_GREEN .. "(Over +" .. FormatGold(difference) .. ")" .. INLINE_RESET
     elseif difference < 0 then
         return INLINE_GOLD .. target .. INLINE_RESET
-            .. "  " .. INLINE_RED .. "(Short " .. FormatGold(math.abs(difference)) .. ")" .. INLINE_RESET
+            .. "\n" .. INLINE_RED .. "(Short " .. FormatGold(math.abs(difference)) .. ")" .. INLINE_RESET
     end
 
     return INLINE_GOLD .. target .. INLINE_RESET
-        .. "  " .. INLINE_GREEN .. "(On Target)" .. INLINE_RESET
+        .. "\n" .. INLINE_GREEN .. "(On Target)" .. INLINE_RESET
 end
 
 -- ============================================================================
@@ -161,6 +161,7 @@ end
 -- ============================================================================
 
 local miniDashboard = CreateFrame("Frame", "IncomeRecordsSystemMiniDashboard", UIParent, "BackdropTemplate")
+IRS:RegisterFormattingRoot(miniDashboard, "mini")
 miniDashboard:SetSize(350, 260)
 miniDashboard:SetFrameStrata("HIGH")
 miniDashboard:SetClampedToScreen(true)
@@ -543,13 +544,14 @@ miniProjectsCollapse:SetScript("OnEnter", function(self)
         and IRS.db.ui.miniDashboard
         and IRS.db.ui.miniDashboard.projectsCollapsed == true
 
-    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:SetText(collapsed and "Expand Savings Projects" or "Collapse Savings Projects")
-    GameTooltip:Show()
+    IRS.tooltip:SetOwner(self, "ANCHOR_RIGHT")
+    IRS.tooltip:SetText(collapsed and "Expand Savings Projects" or "Collapse Savings Projects")
+    IRS:FormatTooltip(IRS.tooltip, "mini")
+    IRS.tooltip:Show()
 end)
 
 miniProjectsCollapse:SetScript("OnLeave", function()
-    GameTooltip:Hide()
+    IRS.tooltip:Hide()
 end)
 
 local miniProjectsBody = CreateFrame("Frame", nil, miniDashboard)
@@ -593,22 +595,21 @@ local function EnsureMiniProjectRow(index)
     row.needAmount = MakeText(row.needLine, "body", COLORS.text, "LEFT")
     row.needStatus = MakeText(row.needLine, "body", COLORS.green, "LEFT")
 
-    -- Centers the combined label + amount + status as one visual line.
+    row.needText = MakeText(row.needLine, "body", COLORS.text, "CENTER")
+    row.needLabel:Hide()
+    row.needAmount:Hide()
     row.LayoutNeedLine = function()
-        local gap = 5
-        local labelWidth = math.ceil(row.needLabel:GetStringWidth() or 0)
-        local amountWidth = math.ceil(row.needAmount:GetStringWidth() or 0)
-        local statusWidth = math.ceil(row.needStatus:GetStringWidth() or 0)
-        local statusGap = statusWidth > 0 and 8 or 0
-        local totalWidth = labelWidth + gap + amountWidth + statusGap + statusWidth
-
-        row.needLabel:ClearAllPoints()
-        row.needAmount:ClearAllPoints()
+        row.needText:SetText((row.needLabel:GetText() ~= "" and (row.needLabel:GetText() .. " ") or "") .. (row.needAmount:GetText() or ""))
+        row.needText:ClearAllPoints()
+        row.needText:SetPoint("TOPLEFT", 0, 0)
+        row.needText:SetPoint("TOPRIGHT", 0, 0)
+        row.needText:SetWordWrap(true)
         row.needStatus:ClearAllPoints()
-
-        row.needLabel:SetPoint("LEFT", row.needLine, "CENTER", -(totalWidth / 2), 0)
-        row.needAmount:SetPoint("LEFT", row.needLabel, "RIGHT", gap, 0)
-        row.needStatus:SetPoint("LEFT", row.needAmount, "RIGHT", statusGap, 0)
+        row.needStatus:SetPoint("TOPLEFT", row.needText, "BOTTOMLEFT", 0, -6)
+        row.needStatus:SetPoint("RIGHT", row.needLine, "RIGHT", 0, 0)
+        row.needStatus:SetJustifyH("CENTER")
+        row.needStatus:SetWordWrap(true)
+        row.needLine:SetHeight(row.needText:GetStringHeight() + 6 + row.needStatus:GetStringHeight())
     end
 
     miniProjectsBody.rows[index] = row
@@ -633,7 +634,7 @@ miniProjectsSummary.title:SetPoint("TOPLEFT", 9, -8)
 miniProjectsSummary.title:SetPoint("TOPRIGHT", -9, -8)
 miniProjectsSummary.title:SetText("DAILY GOLD TARGET")
 
-miniProjectsSummary.need = MakeText(miniProjectsSummary, 12, COLORS.text, "CENTER")
+miniProjectsSummary.need = MakeText(miniProjectsSummary, "body", COLORS.text, "CENTER")
 miniProjectsSummary.need:SetPoint("BOTTOMLEFT", 9, 10)
 miniProjectsSummary.need:SetPoint("BOTTOMRIGHT", -9, 10)
 miniProjectsSummary.need:SetText("0g")
@@ -693,11 +694,12 @@ miniReservesCollapse:SetScript("OnEnter", function(self)
     local collapsed = IRS.db.ui
         and IRS.db.ui.miniDashboard
         and IRS.db.ui.miniDashboard.reservesCollapsed == true
-    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:SetText(collapsed and "Expand Reserve Funds" or "Collapse Reserve Funds")
-    GameTooltip:Show()
+    IRS.tooltip:SetOwner(self, "ANCHOR_RIGHT")
+    IRS.tooltip:SetText(collapsed and "Expand Reserve Funds" or "Collapse Reserve Funds")
+    IRS:FormatTooltip(IRS.tooltip, "mini")
+    IRS.tooltip:Show()
 end)
-miniReservesCollapse:SetScript("OnLeave", function() GameTooltip:Hide() end)
+miniReservesCollapse:SetScript("OnLeave", function() IRS.tooltip:Hide() end)
 
 local miniReservesBody = CreateFrame("Frame", nil, miniDashboard)
 miniReservesBody:SetHeight(1)
@@ -909,7 +911,6 @@ function IRS:RefreshMiniDashboard()
     local headingSize = IRS:GetFontSize("mini", "heading")
     local heading2Size = IRS:GetFontSize("mini", "heading2")
     local heading3Size = IRS:GetFontSize("mini", "heading3")
-    local valueSize = IRS:GetFontSize("mini", "value")
 
     local headerHeight = math.max(38, headingSize + helperSize + 14)
     miniHeader:SetHeight(headerHeight)
@@ -967,18 +968,27 @@ function IRS:RefreshMiniDashboard()
     local visiblePeriodCount = #visiblePeriodRows
     miniPeriods:SetShown(visiblePeriodCount > 0)
 
-    local periodRowHeight = math.max(23, math.max(bodySize, valueSize) + 9)
+    local periodRowHeight = math.max(23, bodySize + 9)
     miniPeriods:SetHeight((periodRowHeight * visiblePeriodCount) + 10)
 
+    local periodOffset = 5
     for i, row in ipairs(visiblePeriodRows) do
         row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", 8, -5 - ((i - 1) * periodRowHeight))
-        row:SetPoint("TOPRIGHT", -8, -5 - ((i - 1) * periodRowHeight))
-        row:SetHeight(periodRowHeight)
+        row:SetPoint("TOPLEFT", 8, -periodOffset)
+        row:SetPoint("TOPRIGHT", -8, -periodOffset)
+        local columnWidth = math.max(1, (row:GetWidth() - 16) / 2)
+        row.label:SetWidth(columnWidth)
+        row.value:SetWidth(columnWidth)
+        row.label:SetWordWrap(true)
+        row.value:SetWordWrap(true)
+        local height = math.max(periodRowHeight, row.label:GetStringHeight() + 10, row.value:GetStringHeight() + 10)
+        row:SetHeight(height)
+        periodOffset = periodOffset + height
         if row.divider then
             row.divider:SetShown(i < visiblePeriodCount)
         end
     end
+    miniPeriods:SetHeight(periodOffset + 5)
 
     local projectsHeaderHeight = math.max(24, heading2Size + 11)
     miniProjectsHeader:ClearAllPoints()
@@ -1019,31 +1029,20 @@ function IRS:RefreshMiniDashboard()
     miniProjectsBody:SetPoint("TOPLEFT", miniProjectsHeader, "BOTTOMLEFT", -3, -2)
     miniProjectsBody:SetPoint("TOPRIGHT", miniProjectsHeader, "BOTTOMRIGHT", 3, -2)
 
-    local projectRowHeight = math.max(54, heading3Size + bodySize + 28)
     local shownBodyHeight = 0
-
     for i = 1, shown do
         local row = miniProjectsBody.rows[i]
-        if row then
-            row:SetHeight(projectRowHeight)
-            row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", 0, -((i - 1) * (projectRowHeight + 4)))
-            row:SetPoint("TOPRIGHT", 0, -((i - 1) * (projectRowHeight + 4)))
-
-            row.name:ClearAllPoints()
-            row.name:SetPoint("TOPLEFT", 8, -8)
-            row.name:SetPoint("TOPRIGHT", -8, -8)
-
-            row.needLine:SetHeight(math.max(20, bodySize + 8))
-            row.needLine:ClearAllPoints()
-            row.needLine:SetPoint("BOTTOMLEFT", 8, 7)
-            row.needLine:SetPoint("BOTTOMRIGHT", -8, 7)
-            row.LayoutNeedLine()
-        end
-    end
-
-    if shown > 0 then
-        shownBodyHeight = (shown * projectRowHeight) + ((shown - 1) * 4)
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", 0, -shownBodyHeight)
+        row:SetPoint("TOPRIGHT", 0, -shownBodyHeight)
+        row.name:SetWordWrap(true)
+        row.needLine:ClearAllPoints()
+        row.needLine:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -8)
+        row.needLine:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+        row.LayoutNeedLine()
+        local height = 7 + row.name:GetStringHeight() + 8 + row.needLine:GetHeight() + 10
+        row:SetHeight(height)
+        shownBodyHeight = shownBodyHeight + height + (i < shown and 4 or 0)
     end
 
     miniProjectsBody:SetHeight(math.max(1, shownBodyHeight))
@@ -1057,7 +1056,18 @@ function IRS:RefreshMiniDashboard()
     miniProjectsMore:SetPoint("TOPLEFT", miniProjectsBody, "BOTTOMLEFT", 3, -2)
     miniProjectsMore:SetPoint("TOPRIGHT", miniProjectsBody, "BOTTOMRIGHT", -3, -2)
 
-    local summaryHeight = math.max(62, heading2Size + valueSize + helperSize + 30)
+    local summaryHeight = math.max(62, heading2Size + bodySize + helperSize + 30)
+    miniProjectsSummary.need:ClearAllPoints()
+    miniProjectsSummary.need:SetPoint("TOPLEFT", miniProjectsSummary.title, "BOTTOMLEFT", 0, -8)
+    miniProjectsSummary.need:SetPoint("RIGHT", miniProjectsSummary, "RIGHT", -9, 0)
+    miniProjectsSummary.need:SetWordWrap(true)
+    miniProjectsSummary.need:SetSpacing(6)
+    miniProjectsSummary.note:ClearAllPoints()
+    miniProjectsSummary.note:SetPoint("TOPLEFT", miniProjectsSummary.need, "BOTTOMLEFT", 0, -6)
+    miniProjectsSummary.note:SetPoint("RIGHT", miniProjectsSummary, "RIGHT", -9, 0)
+    summaryHeight = 8 + miniProjectsSummary.title:GetStringHeight() + 8
+        + miniProjectsSummary.need:GetStringHeight() + 12
+        + (miniProjectsSummary.note:IsShown() and (6 + miniProjectsSummary.note:GetStringHeight()) or 0)
     miniProjectsSummary:SetHeight(summaryHeight)
     miniProjectsSummary:ClearAllPoints()
 
@@ -1095,13 +1105,29 @@ function IRS:RefreshMiniDashboard()
     miniReservesBody:SetPoint("TOPRIGHT", miniReservesHeader, "BOTTOMRIGHT", 0, -2)
     miniReservesBody:SetHeight(math.max(1, reserveBodyHeight))
 
+    local reserveOffset = 0
     for i = 1, shownReserves do
         local row = miniReservesBody.rows[i]
-        row:SetHeight(reserveRowHeight)
         row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", 0, -((i - 1) * (reserveRowHeight + 3)))
-        row:SetPoint("TOPRIGHT", 0, -((i - 1) * (reserveRowHeight + 3)))
+        row:SetPoint("TOPLEFT", 0, -reserveOffset)
+        row:SetPoint("TOPRIGHT", 0, -reserveOffset)
+        row.name:SetWordWrap(true)
+        row.amount:ClearAllPoints()
+        row.amount:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -8)
+        row.amount:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+        row.amount:SetWordWrap(true)
+        row.status:ClearAllPoints()
+        row.status:SetPoint("TOPLEFT", row.amount, "BOTTOMLEFT", 0, -6)
+        row.status:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+        row.status:SetJustifyH("RIGHT")
+        row.status:SetWordWrap(true)
+        local height = 7 + row.name:GetStringHeight() + 8 + row.amount:GetStringHeight()
+            + 6 + row.status:GetStringHeight() + 10
+        row:SetHeight(height)
+        reserveOffset = reserveOffset + height + (i < shownReserves and 3 or 0)
     end
+    reserveBodyHeight = reservesCollapsed and 0 or reserveOffset
+    miniReservesBody:SetHeight(math.max(1, reserveBodyHeight))
 
     local reserveExtraHeight = shownReserves > 0
         and (7 + reserveHeaderHeight + (reservesCollapsed and 10 or (2 + reserveBodyHeight + 10)))

@@ -81,12 +81,16 @@ local function MakeEdit(parent, labelText, x, y, width)
     local label = MakeText(parent, "helper", COLORS.muted, "LEFT")
     label:SetPoint("TOPLEFT", x, y)
     label:SetText(labelText)
+    label:SetWidth(width)
+    label:SetWordWrap(true)
 
     local box = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
     box:SetPoint("TOPLEFT", x + 2, y - 16)
     box:SetSize(width, 25)
     box:SetAutoFocus(false)
     box:SetFontObject(GameFontHighlightSmall)
+    IRS:RegisterFontString("main", "body", box, STANDARD_TEXT_FONT, "")
+    box.label = label
     return box, label
 end
 
@@ -109,7 +113,7 @@ local function ParseGoldInput(text)
 end
 
 local function GoldInputText(copper)
-    return tostring(math.floor((tonumber(copper) or 0) / 10000))
+    return IRS:FormatGoldInput(copper)
 end
 
 local function FormatGold(copper)
@@ -704,7 +708,7 @@ local function MakeInterval(key, label, x)
     local b = MakeButton(page, label, x, -365, 92)
     b:SetScript("OnClick", function()
         local reserve = IRS:GetReserve(selectedReserveId)
-        if reserve then IRS:SetReserveHistoryInterval(reserve, key); IRS:RefreshReservesPage(true) end
+        if reserve then IRS:SetReserveHistoryInterval(selectedReserveId, key); IRS:RefreshReservesPage(true) end
     end)
     intervalButtons[key] = b
 end
@@ -738,12 +742,13 @@ for i = 1, 30 do
     slot.label:SetPoint("BOTTOMLEFT", -20, 1); slot.label:SetPoint("BOTTOMRIGHT", 20, 1)
     slot:SetScript("OnEnter", function(self)
         if not self.row or self.row.amount == nil then return end
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText(self.row.detail or self.row.key or "Reserve history")
-        GameTooltip:AddLine(FormatGold(self.row.amount), 0.88, 0.84, 0.75)
-        GameTooltip:Show()
+        IRS.tooltip:SetOwner(self, "ANCHOR_TOP")
+        IRS.tooltip:SetText(self.row.detail or self.row.key or "Reserve history")
+        IRS.tooltip:AddLine(FormatGold(self.row.amount), 0.88, 0.84, 0.75)
+        IRS:FormatTooltip(IRS.tooltip, "main")
+        IRS.tooltip:Show()
     end)
-    slot:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    slot:SetScript("OnLeave", function() IRS.tooltip:Hide() end)
     chart.bars[i] = slot
 end
 
@@ -1015,7 +1020,9 @@ local function RefreshChart(reserve, stats)
         chart.warningLabel:GetStringWidth() or 0
     )
     local leftInset = math.max(50, math.ceil(labelWidth) + 12)
-    local rightInset, bottomInset, topInset = 15, 28, 20
+    local rightInset = 15
+    local bottomInset = math.max(28, IRS:GetFontSize("main", "helper") + 16)
+    local topInset = math.max(20, chart.targetLabel:GetStringHeight())
     local plotWidth = math.max(200, chartWidth - leftInset - rightInset)
     local plotHeight = math.max(120, (chart:GetHeight() or 285) - bottomInset - topInset)
     local count = math.max(1, #rows)
@@ -1028,6 +1035,9 @@ local function RefreshChart(reserve, stats)
     chart.targetLabel:ClearAllPoints(); chart.targetLabel:SetPoint("BOTTOMRIGHT", chart, "BOTTOMLEFT", leftInset - 4, targetY - 6); chart.targetLabel:Show()
     chart.warningLabel:ClearAllPoints(); chart.warningLabel:SetPoint("BOTTOMRIGHT", chart, "BOTTOMLEFT", leftInset - 4, warningY - 6); chart.warningLabel:Show()
     chart.zeroLabel:ClearAllPoints(); chart.zeroLabel:SetPoint("BOTTOMRIGHT", chart, "BOTTOMLEFT", leftInset - 4, bottomInset - 5); chart.zeroLabel:Show()
+    -- Near-zero warning floors already identify the lower reference line.
+    -- Suppress the redundant zero label when their text would overlap.
+    chart.zeroLabel:SetShown(warningY - bottomInset > chart.warningLabel:GetStringHeight() + 8)
 
     local labelEvery = interval == "monthly" and 1 or math.max(1, math.ceil(count / 6))
     for i=1,30 do
@@ -1053,13 +1063,94 @@ end
 function IRS:RefreshReservesLayout()
     if not page then return end
     local width = math.max(1, page:GetWidth() or 854)
-    summary:SetWidth(width - 8)
+    local helper = IRS:GetFontSize("main", "helper")
+    local body = IRS:GetFontSize("main", "body")
+    local buttonHeight = math.max(28, helper + 14)
+    local function Below(object, anchor, x, padding)
+        object:ClearAllPoints()
+        object:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", x or 0, -(padding or 12))
+    end
+    local function ButtonRow(buttons, anchor)
+        local x, rowHeight = 0, buttonHeight
+        for _, button in ipairs(buttons) do
+            local buttonWidth = math.max(button:GetWidth(), button.label:GetStringWidth() + 24)
+            if x > 0 and x + buttonWidth > width - 8 then
+                x = 0
+                rowHeight = rowHeight + buttonHeight + 8
+            end
+            button:ClearAllPoints()
+            button:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", x, -(12 + rowHeight - buttonHeight))
+            button:SetSize(buttonWidth, buttonHeight)
+            x = x + buttonWidth + 10
+        end
+        return rowHeight
+    end
+
+    Below(selectLabel, desc)
+    Below(selectButton, selectLabel, 0, 6)
+    selectButton:SetHeight(buttonHeight)
+    local toolbarHeight = ButtonRow({newButton, deleteButton, convertButton}, selectButton)
+    convertHint:ClearAllPoints()
+    convertHint:SetPoint("TOPLEFT", selectButton, "BOTTOMLEFT", 0, -(toolbarHeight + 20))
+    convertHint:SetWidth(width - 8)
+    convertHint:SetJustifyH("LEFT")
+    Below(statusText, convertHint, 0, 6)
+    statusText:SetPoint("RIGHT", page, "RIGHT", -4, 0)
+
+    local fields = {nameBox, targetBox, warningBox, startBox, allocationBox}
+    local fieldGap = 12
+    local fieldWidth = math.max(1, (width - 8 - fieldGap * 4) / 5)
+    local labelHeight = helper
+    for i, box in ipairs(fields) do
+        Below(box.label, statusText, (i - 1) * (fieldWidth + fieldGap))
+        box.label:SetWidth(fieldWidth - 4)
+        labelHeight = math.max(labelHeight, box.label:GetStringHeight())
+    end
+    for _, box in ipairs(fields) do
+        box:ClearAllPoints()
+        box:SetPoint("TOPLEFT", box.label, "TOPLEFT", 2, -(labelHeight + 8))
+        box:SetSize(fieldWidth - 4, math.max(25, body + 12))
+    end
+
+    Below(sourceTitle, nameBox, -2, 16)
+    sourceTitle:SetWidth((width - 20) / 2)
+    detailTitle:ClearAllPoints()
+    detailTitle:SetPoint("TOPLEFT", sourceTitle, "TOPLEFT", (width - 8) / 2 + 6, 0)
+    detailTitle:SetWidth((width - 20) / 2)
+    local sourceLabelHeight = math.max(sourceTitle:GetStringHeight(), detailTitle:GetStringHeight())
+    for _, info in ipairs({{sourceButton, sourceTitle}, {detailButton, detailTitle}}) do
+        info[1]:ClearAllPoints()
+        info[1]:SetPoint("TOPLEFT", info[2], "TOPLEFT", 0, -(sourceLabelHeight + 8))
+        info[1]:SetSize((width - 20) / 2, buttonHeight)
+    end
+    local actionsHeight = ButtonRow({saveButton, syncButton}, sourceButton)
+    alertsCheck:ClearAllPoints()
+    alertsCheck:SetPoint("TOPLEFT", sourceButton, "BOTTOMLEFT", 0, -(actionsHeight + 24))
+    miniCheck:ClearAllPoints()
+    miniCheck:SetPoint("LEFT", alertsLabel, "RIGHT", 20, 0)
+    Below(summary, alertsCheck, 0, 18)
+    summary:SetPoint("RIGHT", page, "RIGHT", -4, 0)
     local gap = 8
     local cardWidth = math.max(120, ((width - 8) - (gap * 3)) / 4)
+    local cardHeight = 0
     for i, card in ipairs(summary.cards) do
         card:ClearAllPoints(); card:SetPoint("TOPLEFT", summary, "TOPLEFT", (i-1)*(cardWidth+gap), 0); card:SetWidth(cardWidth); card.value:SetWidth(math.max(100,cardWidth-12))
+        Below(card.value, card.label, 0, 12)
+        card.value:SetPoint("RIGHT", card, "RIGHT", -6, 0)
+        Below(card.detail, card.value, 0, 10)
+        card.detail:SetPoint("RIGHT", card, "RIGHT", -6, 0)
+        cardHeight = math.max(cardHeight, 7 + card.label:GetStringHeight() + 12 + card.value:GetStringHeight() + 10 + card.detail:GetStringHeight() + 12)
     end
-    chart:SetPoint("TOPRIGHT", page, "TOPRIGHT", -4, -425)
+    for _, card in ipairs(summary.cards) do card:SetHeight(cardHeight) end
+    summary:SetHeight(cardHeight)
+    Below(historyTitle, summary, 0, 24)
+    historyTitle:SetWidth(width - 8)
+    historyNote:SetWidth(width - 8)
+    local intervalHeight = ButtonRow({intervalButtons.daily, intervalButtons.weekly, intervalButtons.monthly}, historyNote)
+    chart:ClearAllPoints()
+    chart:SetPoint("TOPLEFT", historyNote, "BOTTOMLEFT", 0, -(intervalHeight + 24))
+    chart:SetPoint("RIGHT", page, "RIGHT", -4, 0)
+    chart:SetHeight(math.max(285, helper * 2 + 250))
 end
 
 function IRS:RefreshReservesPage(preserveForm)
@@ -1093,14 +1184,15 @@ function IRS:RefreshReservesPage(preserveForm)
             button:SetBackdropBorderColor(unpack(active and COLORS.goldSoft or COLORS.borderSoft))
             SetColor(button.label, active and COLORS.gold or COLORS.text)
         end
+        IRS:RefreshReservesLayout()
         RefreshChart(reserve, stats)
     else
         for _, card in ipairs(summary.cards) do card.value:SetText("—"); card.detail:SetText(""); SetColor(card.value, COLORS.muted) end
         chart.empty:SetText("Create or select a Reserve Fund to view its history.")
+        IRS:RefreshReservesLayout()
         RefreshChart(nil, nil)
     end
 
-    IRS:RefreshReservesLayout()
     if IRS.RefreshPageScroll and IRS.activeTab == "reserves" then IRS:RefreshPageScroll("reserves") end
 end
 

@@ -279,6 +279,7 @@ end
 
 -- Dedicated visual Token alert shown when the Mini Dashboard is not open.
 local tokenSplash = MakePanel(UIParent, COLORS.panelAlt)
+IRS:RegisterFormattingRoot(tokenSplash, "main")
 tokenSplash:SetSize(460, 94)
 tokenSplash:SetPoint("TOP", UIParent, "TOP", 0, -165)
 tokenSplash:SetFrameStrata("DIALOG")
@@ -624,6 +625,7 @@ local function MakeCheck(parent, labelText, x, y, onClick)
     local label = MakeText(parent, "body", COLORS.text, "LEFT")
     label:SetPoint("LEFT", check, "RIGHT", 5, 0)
     label:SetText(labelText)
+    check.label = label
 
     check:SetScript("OnClick", function(self)
         onClick(self:GetChecked())
@@ -643,6 +645,8 @@ local function MakeNumberSetting(parent, labelText, x, y, width, callback)
     box:SetAutoFocus(false)
     box:SetNumeric(false)
     box:SetMaxLetters(6)
+    box.label = label
+    IRS:RegisterFontString("main", "body", box, STANDARD_TEXT_FONT, "")
 
     box:SetScript("OnEnterPressed", function(self)
         callback(tonumber(self:GetText()))
@@ -770,6 +774,7 @@ function IRS:BuildTokenSettingsSection(parent)
         local s = market.settings
 
         local off = UIDropDownMenu_CreateInfo()
+        off.fontObject = IRS:GetControlFont("main")
         off.text = "Off"
         off.checked = s.soundAlert ~= true
         off.func = function()
@@ -779,6 +784,7 @@ function IRS:BuildTokenSettingsSection(parent)
 
         for _, choice in ipairs(IRS:GetTokenSoundChoices()) do
             local info = UIDropDownMenu_CreateInfo()
+            info.fontObject = IRS:GetControlFont("main")
             info.text = choice.label
             info.checked = s.soundAlert == true
                 and s.soundKey == choice.key
@@ -885,6 +891,95 @@ function IRS:BuildTokenSettingsSection(parent)
         "BUY WITH GOLD = unusually low Token price.  SELL FOR GOLD = unusually high Token price. Alerts trigger when the market enters a zone."
     )
 
+    settingsUI.layout = function()
+        local width = math.max(1, marketPanel:GetWidth() - 24)
+        local function Below(object, previous, gap)
+            object:ClearAllPoints()
+            object:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -(gap or 10))
+        end
+        local function FitButton(button)
+            local text = button:GetFontString()
+            text:SetFontObject(IRS:GetControlFont("main"))
+            text:SetWordWrap(false)
+            button:SetSize(text:GetUnboundedStringWidth() + 24,
+                math.max(28, text:GetStringHeight() + 12))
+        end
+        marketPanel:ClearAllPoints()
+        marketPanel:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", -2, -14)
+        marketPanel:SetPoint("RIGHT", frame, "RIGHT", -14, 0)
+        local previous = settingsUI.price
+        settingsUI.price:SetWidth(width)
+        for _, text in ipairs({settingsUI.average, settingsUI.context, settingsUI.status}) do
+            Below(text, previous)
+            text:SetWidth(width)
+            text:SetWordWrap(true)
+            text:SetJustifyH("LEFT")
+            previous = text
+        end
+        FitButton(settingsUI.refresh)
+        Below(settingsUI.refresh, previous, 12)
+        marketPanel:SetHeight(12 + settingsUI.price:GetStringHeight()
+            + settingsUI.average:GetStringHeight() + settingsUI.context:GetStringHeight()
+            + settingsUI.status:GetStringHeight() + 30 + 12 + settingsUI.refresh:GetHeight() + 12)
+
+        local y = 10 + alertTitle:GetStringHeight() + 12
+        for _, check in ipairs({settingsUI.enabled, settingsUI.chat, settingsUI.screen}) do
+            check:ClearAllPoints()
+            check:SetPoint("TOPLEFT", 10, -y)
+            check.label:SetWidth(width - 38)
+            check.label:SetWordWrap(true)
+            y = y + math.max(28, check.label:GetStringHeight()) + 10
+        end
+        settingsUI.soundLabel:ClearAllPoints()
+        settingsUI.soundLabel:SetPoint("TOPLEFT", 12, -y)
+        settingsUI.soundLabel:SetWidth(width)
+        y = y + settingsUI.soundLabel:GetStringHeight() + 8
+        settingsUI.soundDropdown:ClearAllPoints()
+        settingsUI.soundDropdown:SetPoint("TOPLEFT", -4, -y)
+        y = y + math.max(32, IRS:GetFontSize("main", "label") + 16) + 14
+        local columns = {settingsUI.interval, settingsUI.averageDays, settingsUI.buy,
+            settingsUI.extremeBuy, settingsUI.sell, settingsUI.extremeSell}
+        local columnWidth = math.max(1, (width - 16) / 2)
+        for i = 1, #columns, 2 do
+            local labelHeight = 0
+            for j = i, i + 1 do
+                local box = columns[j]
+                box.label:ClearAllPoints()
+                box.label:SetPoint("TOPLEFT", 12 + (j - i) * (columnWidth + 16), -y)
+                box.label:SetWidth(columnWidth)
+                box.label:SetWordWrap(true)
+                labelHeight = math.max(labelHeight, box.label:GetStringHeight())
+            end
+            local inputHeight = math.max(26, IRS:GetFontSize("main", "body") + 12)
+            for j = i, i + 1 do
+                local box = columns[j]
+                box:ClearAllPoints()
+                box:SetPoint("TOPLEFT", box.label, "TOPLEFT", 2, -(labelHeight + 8))
+                box:SetSize(math.min(columnWidth - 4, math.max(80, IRS:GetFontSize("main", "body") * 4 + 16)), inputHeight)
+            end
+            y = y + labelHeight + 8 + inputHeight + 16
+        end
+        testLabel:ClearAllPoints()
+        testLabel:SetPoint("TOPLEFT", 12, -y)
+        y = y + testLabel:GetStringHeight() + 8
+        FitButton(settingsUI.testBuy)
+        FitButton(settingsUI.testSell)
+        settingsUI.testBuy:ClearAllPoints()
+        settingsUI.testBuy:SetPoint("TOPLEFT", 12, -y)
+        settingsUI.testSell:ClearAllPoints()
+        if settingsUI.testBuy:GetWidth() + settingsUI.testSell:GetWidth() + 12 <= width then
+            settingsUI.testSell:SetPoint("LEFT", settingsUI.testBuy, "RIGHT", 12, 0)
+            y = y + math.max(settingsUI.testBuy:GetHeight(), settingsUI.testSell:GetHeight())
+        else
+            Below(settingsUI.testSell, settingsUI.testBuy)
+            y = y + settingsUI.testBuy:GetHeight() + 10 + settingsUI.testSell:GetHeight()
+        end
+        help:ClearAllPoints()
+        help:SetPoint("TOPLEFT", 12, -(y + 14))
+        help:SetWidth(width)
+        help:SetWordWrap(true)
+        alertPanel:SetHeight(y + 14 + help:GetStringHeight() + 12)
+    end
     return frame
 end
 
@@ -970,6 +1065,7 @@ function IRS:RefreshTokenSettingsSection()
 
     settingsUI.status:SetText(summary.status)
     SetColor(settingsUI.status, StatusColor(summary.status))
+    settingsUI.layout()
 end
 
 -- ============================================================================
