@@ -31,7 +31,7 @@ local function TodayKey()
 end
 
 local function SetColor(fs, color)
-    fs:SetTextColor(color[1], color[2], color[3], color[4] or 1)
+    IRS:SetLayoutColor(fs, "SetTextColor", color[1], color[2], color[3], color[4] or 1)
 end
 
 local function MakeText(parent, style, color, justify, flags)
@@ -53,8 +53,8 @@ local function MakePanel(parent, color)
         edgeSize = 2,
     })
     local c = color or COLORS.panelAlt
-    frame:SetBackdropColor(c[1], c[2], c[3], c[4] or 1)
-    frame:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+    IRS:SetLayoutColor(frame, "SetBackdropColor", c[1], c[2], c[3], c[4] or 1)
+    IRS:SetLayoutColor(frame, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
     return frame
 end
 
@@ -68,8 +68,8 @@ local function MakeButton(parent, text, x, y, width, onClick)
         edgeFile = "Interface/Buttons/WHITE8X8",
         edgeSize = 2,
     })
-    button:SetBackdropColor(unpack(COLORS.panelAlt))
-    button:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+    IRS:SetLayoutColor(button, "SetBackdropColor", unpack(COLORS.panelAlt))
+    IRS:SetLayoutColor(button, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
     button.label = MakeText(button, "helper", COLORS.text, "CENTER")
     button.label:SetAllPoints()
     button.label:SetText(text)
@@ -677,7 +677,7 @@ for i, label in ipairs(summaryLabels) do
     if i > 1 then
         local divider = card:CreateTexture(nil, "BORDER")
         divider:SetTexture("Interface/Buttons/WHITE8X8")
-        divider:SetVertexColor(unpack(COLORS.borderSoft))
+        IRS:SetLayoutColor(divider, "SetVertexColor", unpack(COLORS.borderSoft))
         divider:SetWidth(1); divider:SetPoint("TOPLEFT", 0, -4); divider:SetPoint("BOTTOMLEFT", 0, 4)
     end
     card.label = MakeText(card, "helper", COLORS.goldSoft, "CENTER")
@@ -723,9 +723,9 @@ chart.empty = MakeText(chart, "body", COLORS.muted, "CENTER")
 chart.empty:SetPoint("CENTER", 0, 0); chart.empty:SetText("Select a Reserve to view history.")
 
 chart.targetLine = chart:CreateTexture(nil, "ARTWORK")
-chart.targetLine:SetTexture("Interface/Buttons/WHITE8X8"); chart.targetLine:SetVertexColor(unpack(COLORS.goldSoft)); chart.targetLine:SetHeight(2)
+chart.targetLine:SetTexture("Interface/Buttons/WHITE8X8"); IRS:SetLayoutColor(chart.targetLine, "SetVertexColor", unpack(COLORS.goldSoft)); chart.targetLine:SetHeight(2)
 chart.warningLine = chart:CreateTexture(nil, "ARTWORK")
-chart.warningLine:SetTexture("Interface/Buttons/WHITE8X8"); chart.warningLine:SetVertexColor(unpack(COLORS.red)); chart.warningLine:SetHeight(1)
+chart.warningLine:SetTexture("Interface/Buttons/WHITE8X8"); IRS:SetLayoutColor(chart.warningLine, "SetVertexColor", unpack(COLORS.red)); chart.warningLine:SetHeight(1)
 chart.targetLabel = MakeText(chart, "helper", COLORS.goldSoft, "RIGHT")
 chart.warningLabel = MakeText(chart, "helper", COLORS.red, "RIGHT")
 chart.zeroLabel = MakeText(chart, "helper", COLORS.muted, "RIGHT"); chart.zeroLabel:SetText("0g")
@@ -791,11 +791,11 @@ local function EnsurePopupRow(container, child, index, width)
     IRS:StyleButtonFeedback(row)
     row:SetHeight(26); row:SetWidth(width)
     row:SetBackdrop({bgFile = "Interface/Buttons/WHITE8X8"})
-    row:SetBackdropColor(0.15, 0.115, 0.070, 0.65)
+    IRS:SetLayoutColor(row, "SetBackdropColor", 0.15, 0.115, 0.070, 0.65)
     row.text = MakeText(row, "helper", COLORS.text, "LEFT")
     row.text:SetPoint("LEFT", 8, 0); row.text:SetPoint("RIGHT", -6, 0)
-    row:SetScript("OnEnter", function(self) self:SetBackdropColor(0.25, 0.19, 0.12, 0.85) end)
-    row:SetScript("OnLeave", function(self) self:SetBackdropColor(0.15, 0.115, 0.070, 0.65) end)
+    row:SetScript("OnEnter", function(self) IRS:SetLayoutColor(self, "SetBackdropColor", 0.25, 0.19, 0.12, 0.85) end)
+    row:SetScript("OnLeave", function(self) IRS:SetLayoutColor(self, "SetBackdropColor", 0.15, 0.115, 0.070, 0.65) end)
     container.rows[index] = row
     return row
 end
@@ -874,7 +874,7 @@ for i, choice in ipairs(sourceChoices) do
     local row = CreateFrame("Button", nil, sourcePopup, "BackdropTemplate")
     IRS:StyleButtonFeedback(row)
     row:SetPoint("TOPLEFT", 4, -4 - ((i - 1) * 28)); row:SetSize(182, 26)
-    row:SetBackdrop({bgFile="Interface/Buttons/WHITE8X8"}); row:SetBackdropColor(0.15,0.115,0.070,0.65)
+    row:SetBackdrop({bgFile="Interface/Buttons/WHITE8X8"}); IRS:SetLayoutColor(row, "SetBackdropColor", 0.15,0.115,0.070,0.65)
     row.text = MakeText(row, "helper", COLORS.text, "LEFT"); row.text:SetPoint("LEFT", 8, 0); row.text:SetText(choice.label)
     row:SetScript("OnClick", function()
         reserveSourceType = choice.key; reserveSourceKey = nil
@@ -1050,7 +1050,7 @@ local function RefreshChart(reserve, stats)
             if amount ~= nil then
                 local height = math.max(1, plotHeight * (amount / maxValue)); slot.bar:SetHeight(height); slot.bar:SetWidth(math.max(4, math.min(24, slotWidth * 0.60)))
                 local c = amount >= stats.target and COLORS.green or (amount < stats.warning and COLORS.red or COLORS.amber)
-                slot.bar:SetVertexColor(unpack(c)); slot.bar:Show()
+                IRS:SetLayoutColor(slot.bar, "SetVertexColor", unpack(c)); slot.bar:Show()
             else slot.bar:Hide() end
             slot.label:SetText(((i-1) % labelEvery == 0 or i == count) and row.label or "")
             slot:Show()
@@ -1180,8 +1180,8 @@ function IRS:RefreshReservesPage(preserveForm)
 
         for key, button in pairs(intervalButtons) do
             local active = key == (reserve.historyInterval or "daily")
-            button:SetBackdropColor(unpack(active and COLORS.panelAlt or COLORS.panel))
-            button:SetBackdropBorderColor(unpack(active and COLORS.goldSoft or COLORS.borderSoft))
+            IRS:SetLayoutColor(button, "SetBackdropColor", unpack(active and COLORS.panelAlt or COLORS.panel))
+            IRS:SetLayoutColor(button, "SetBackdropBorderColor", unpack(active and COLORS.goldSoft or COLORS.borderSoft))
             SetColor(button.label, active and COLORS.gold or COLORS.text)
         end
         IRS:RefreshReservesLayout()

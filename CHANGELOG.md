@@ -6,6 +6,10 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 
 ## [Unreleased]
 
+### Added
+
+- Added an account-wide Layout style selector under Settings > Fonts, with IRS Default and ElvUI Inspired appearances. The dark translucent style applies immediately to IRS windows, panels, and popups without requiring ElvUI.
+
 ## [1.3.0] - 2026-10-12
 
 ### Added

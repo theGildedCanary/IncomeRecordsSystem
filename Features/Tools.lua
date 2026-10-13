@@ -383,7 +383,7 @@ local function BuildToolsUI()
     if page._irsToolsUIBuilt then return true end
 
 local function SetColor(fs, color)
-    fs:SetTextColor(color[1], color[2], color[3], color[4] or 1)
+    IRS:SetLayoutColor(fs, "SetTextColor", color[1], color[2], color[3], color[4] or 1)
 end
 
 local function MakeText(parent, style, color, justify, flags)
@@ -401,8 +401,8 @@ local function MakePanel(parent, color)
     local frame = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     frame:SetBackdrop({bgFile="Interface/Buttons/WHITE8X8",edgeFile="Interface/Buttons/WHITE8X8",edgeSize=2})
     local c = color or COLORS.panelAlt
-    frame:SetBackdropColor(c[1], c[2], c[3], c[4] or 1)
-    frame:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+    IRS:SetLayoutColor(frame, "SetBackdropColor", c[1], c[2], c[3], c[4] or 1)
+    IRS:SetLayoutColor(frame, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
     return frame
 end
 
@@ -412,8 +412,8 @@ local function MakeButton(parent, text, x, y, width)
     button:SetPoint("TOPLEFT", x, y)
     button:SetSize(width, 30)
     button:SetBackdrop({bgFile="Interface/Buttons/WHITE8X8",edgeFile="Interface/Buttons/WHITE8X8",edgeSize=2})
-    button:SetBackdropColor(unpack(COLORS.panelAlt))
-    button:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+    IRS:SetLayoutColor(button, "SetBackdropColor", unpack(COLORS.panelAlt))
+    IRS:SetLayoutColor(button, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
     button.label = MakeText(button, "helper", COLORS.text, "CENTER")
     button.label:SetAllPoints()
     button.label:SetText(text)
@@ -485,7 +485,7 @@ local adjustmentTab = MakeToolsTab("DAILY ADJUSTMENT", 160)
 adjustmentTab:SetPoint("LEFT", manualTab, "RIGHT", 8, 0)
 
 local tabsDivider = page:CreateTexture(nil, "ARTWORK")
-tabsDivider:SetColorTexture(unpack(COLORS.borderSoft))
+IRS:SetLayoutColor(tabsDivider, "SetColorTexture", unpack(COLORS.borderSoft))
 tabsDivider:SetHeight(2)
 tabsDivider:SetPoint("TOPLEFT", page, "TOPLEFT", 4, -88)
 tabsDivider:SetPoint("TOPRIGHT", page, "TOPRIGHT", -4, -88)
@@ -710,12 +710,12 @@ function IRS:SetToolsSection(section)
     manualView:SetShown(not adjustmentActive)
     adjustmentView:SetShown(adjustmentActive)
 
-    manualTab:SetBackdropColor(unpack(adjustmentActive and COLORS.panel or COLORS.panelAlt))
-    manualTab:SetBackdropBorderColor(unpack(adjustmentActive and COLORS.borderSoft or COLORS.goldSoft))
+    IRS:SetLayoutColor(manualTab, "SetBackdropColor", unpack(adjustmentActive and COLORS.panel or COLORS.panelAlt))
+    IRS:SetLayoutColor(manualTab, "SetBackdropBorderColor", unpack(adjustmentActive and COLORS.borderSoft or COLORS.goldSoft))
     SetColor(manualTab.label, adjustmentActive and COLORS.text or COLORS.gold)
 
-    adjustmentTab:SetBackdropColor(unpack(adjustmentActive and COLORS.panelAlt or COLORS.panel))
-    adjustmentTab:SetBackdropBorderColor(unpack(adjustmentActive and COLORS.goldSoft or COLORS.borderSoft))
+    IRS:SetLayoutColor(adjustmentTab, "SetBackdropColor", unpack(adjustmentActive and COLORS.panelAlt or COLORS.panel))
+    IRS:SetLayoutColor(adjustmentTab, "SetBackdropBorderColor", unpack(adjustmentActive and COLORS.goldSoft or COLORS.borderSoft))
     SetColor(adjustmentTab.label, adjustmentActive and COLORS.gold or COLORS.text)
 
     if adjustmentActive then
@@ -792,8 +792,8 @@ local function EnsureDistRow(index)
     local row = CreateFrame("Frame", nil, listChild, "BackdropTemplate")
     row:SetHeight(42)
     row:SetBackdrop({bgFile="Interface/Buttons/WHITE8X8",edgeFile="Interface/Buttons/WHITE8X8",edgeSize=1})
-    row:SetBackdropColor(COLORS.panel[1],COLORS.panel[2],COLORS.panel[3],0.50)
-    row:SetBackdropBorderColor(COLORS.borderSoft[1],COLORS.borderSoft[2],COLORS.borderSoft[3],0.55)
+    IRS:SetLayoutColor(row, "SetBackdropColor", COLORS.panel[1],COLORS.panel[2],COLORS.panel[3],0.50)
+    IRS:SetLayoutColor(row, "SetBackdropBorderColor", COLORS.borderSoft[1],COLORS.borderSoft[2],COLORS.borderSoft[3],0.55)
     row.goal = MakeText(row, "body", COLORS.text, "LEFT")
     row.destination = MakeText(row, "helper", COLORS.muted, "LEFT")
 
@@ -964,18 +964,18 @@ local function RefreshCheckpointAppearance()
     if enabled then
         if not checkpoint:IsEnabled() then checkpoint:Enable() end
         if checkpointHover then
-            checkpoint:SetBackdropColor(0.285,0.215,0.135,0.98)
-            checkpoint:SetBackdropBorderColor(unpack(COLORS.gold))
+            IRS:SetLayoutColor(checkpoint, "SetBackdropColor", 0.285,0.215,0.135,0.98)
+            IRS:SetLayoutColor(checkpoint, "SetBackdropBorderColor", unpack(COLORS.gold))
             SetColor(checkpoint.label,COLORS.gold)
         else
-            checkpoint:SetBackdropColor(unpack(COLORS.panelAlt))
-            checkpoint:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+            IRS:SetLayoutColor(checkpoint, "SetBackdropColor", unpack(COLORS.panelAlt))
+            IRS:SetLayoutColor(checkpoint, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
             SetColor(checkpoint.label,COLORS.text)
         end
     else
         if checkpoint:IsEnabled() then checkpoint:Disable() end
-        checkpoint:SetBackdropColor(COLORS.panel[1],COLORS.panel[2],COLORS.panel[3],0.55)
-        checkpoint:SetBackdropBorderColor(COLORS.borderSoft[1],COLORS.borderSoft[2],COLORS.borderSoft[3],0.55)
+        IRS:SetLayoutColor(checkpoint, "SetBackdropColor", COLORS.panel[1],COLORS.panel[2],COLORS.panel[3],0.55)
+        IRS:SetLayoutColor(checkpoint, "SetBackdropBorderColor", COLORS.borderSoft[1],COLORS.borderSoft[2],COLORS.borderSoft[3],0.55)
         SetColor(checkpoint.label,COLORS.muted)
     end
     checkpointAppearanceRefreshing=false
@@ -983,7 +983,7 @@ end
 
 checkpoint:SetScript("OnEnter",function() checkpointHover=true; RefreshCheckpointAppearance() end)
 checkpoint:SetScript("OnLeave",function() checkpointHover=false; RefreshCheckpointAppearance() end)
-checkpoint:SetScript("OnMouseDown",function(self) if self:IsEnabled() then self:SetBackdropColor(0.32,0.24,0.145,1) end end)
+checkpoint:SetScript("OnMouseDown",function(self) if self:IsEnabled() then IRS:SetLayoutColor(self, "SetBackdropColor", 0.32,0.24,0.145,1) end end)
 checkpoint:SetScript("OnMouseUp",RefreshCheckpointAppearance)
 checkpoint:SetScript("OnClick",function()
     local data=IRS:GetProfitDistribution()

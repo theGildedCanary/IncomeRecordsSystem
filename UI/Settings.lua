@@ -21,7 +21,7 @@ local COLORS = {
 }
 
 local function SetColor(fontString, color)
-    fontString:SetTextColor(color[1], color[2], color[3], color[4] or 1)
+    IRS:SetLayoutColor(fontString, "SetTextColor", color[1], color[2], color[3], color[4] or 1)
 end
 
 local function MakeText(parent, size, color, justify)
@@ -48,8 +48,8 @@ local function MakePanel(parent, bgColor)
         edgeSize = 2,
     })
     local c = bgColor or COLORS.panel
-    panel:SetBackdropColor(c[1], c[2], c[3], c[4] or 1)
-    panel:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+    IRS:SetLayoutColor(panel, "SetBackdropColor", c[1], c[2], c[3], c[4] or 1)
+    IRS:SetLayoutColor(panel, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
     return panel
 end
 
@@ -70,10 +70,10 @@ local rail = MakePanel(page, COLORS.panel)
 rail:SetPoint("TOPLEFT", 4, -72)
 rail:SetPoint("BOTTOMLEFT", 4, 4)
 rail:SetWidth(154)
-rail:SetBackdropBorderColor(0, 0, 0, 0)
+IRS:SetLayoutColor(rail, "SetBackdropBorderColor", 0, 0, 0, 0)
 rail.divider = rail:CreateTexture(nil, "BORDER")
 rail.divider:SetTexture("Interface/Buttons/WHITE8X8")
-rail.divider:SetVertexColor(unpack(COLORS.borderSoft))
+IRS:SetLayoutColor(rail.divider, "SetVertexColor", unpack(COLORS.borderSoft))
 rail.divider:SetWidth(1)
 rail.divider:SetPoint("TOPRIGHT", -1, 0)
 rail.divider:SetPoint("BOTTOMRIGHT", -1, 0)
@@ -81,7 +81,7 @@ rail.divider:SetPoint("BOTTOMRIGHT", -1, 0)
 local body = MakePanel(page, COLORS.panel)
 body:SetPoint("TOPLEFT", rail, "TOPRIGHT", 10, 0)
 body:SetPoint("BOTTOMRIGHT", -4, 4)
-body:SetBackdropBorderColor(0, 0, 0, 0)
+IRS:SetLayoutColor(body, "SetBackdropBorderColor", 0, 0, 0, 0)
 
 local sections = {}
 local sectionButtons = {}
@@ -98,13 +98,13 @@ local SECTION_INFO = {
 local function ApplySectionVisuals()
     for key, button in pairs(sectionButtons) do
         if key == activeSection then
-            button:SetBackdropColor(0.15, 0.115, 0.070, 0.42)
-            button:SetBackdropBorderColor(0, 0, 0, 0)
+            IRS:SetLayoutColor(button, "SetBackdropColor", 0.15, 0.115, 0.070, 0.42)
+            IRS:SetLayoutColor(button, "SetBackdropBorderColor", 0, 0, 0, 0)
             SetColor(button.label, COLORS.gold)
             button.activeBar:Show()
         else
-            button:SetBackdropColor(unpack(COLORS.panelAlt))
-            button:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+            IRS:SetLayoutColor(button, "SetBackdropColor", unpack(COLORS.panelAlt))
+            IRS:SetLayoutColor(button, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
             SetColor(button.label, COLORS.text)
             button.activeBar:Hide()
         end
@@ -134,12 +134,12 @@ for i, info in ipairs(SECTION_INFO) do
     button:SetPoint("TOPLEFT", 7, -8 - ((i - 1) * 38))
     button:SetSize(140, 32)
     button:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8" })
-    button:SetBackdropColor(0, 0, 0, 0)
-    button:SetBackdropBorderColor(0, 0, 0, 0)
+    IRS:SetLayoutColor(button, "SetBackdropColor", 0, 0, 0, 0)
+    IRS:SetLayoutColor(button, "SetBackdropBorderColor", 0, 0, 0, 0)
 
     button.activeBar = button:CreateTexture(nil, "ARTWORK")
     button.activeBar:SetTexture("Interface/Buttons/WHITE8X8")
-    button.activeBar:SetVertexColor(unpack(COLORS.gold))
+    IRS:SetLayoutColor(button.activeBar, "SetVertexColor", unpack(COLORS.gold))
     button.activeBar:SetWidth(2)
     button.activeBar:SetPoint("TOPLEFT", 0, -4)
     button.activeBar:SetPoint("BOTTOMLEFT", 0, 4)
@@ -337,8 +337,8 @@ for i, choice in ipairs(anchorChoices) do
 
     button:SetScript("OnEnter", function(self)
         if IRS:GetMiniDashboardAnchor() ~= self.anchorKey then
-            self:SetBackdropColor(unpack(COLORS.panel))
-            self:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+            IRS:SetLayoutColor(self, "SetBackdropColor", unpack(COLORS.panel))
+            IRS:SetLayoutColor(self, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
         end
     end)
 
@@ -431,7 +431,7 @@ local function EnsureProjectRow(index)
 
     local row = MakePanel(projectChild, COLORS.panel)
     row:SetHeight(48)
-    row:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+    IRS:SetLayoutColor(row, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
 
     row.check = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
     row.check:SetSize(28, 28)
@@ -491,7 +491,7 @@ sections.fonts = fonts
 
 local fontsTitle = MakeText(fonts, 16, COLORS.goldSoft, "LEFT")
 fontsTitle:SetPoint("TOPLEFT", 16, -14)
-fontsTitle:SetText("FONT STYLES")
+fontsTitle:SetText("FONTS & LAYOUT STYLE")
 
 local fontsDesc = MakeText(fonts, 8, COLORS.muted, "LEFT")
 fontsDesc:SetPoint("TOPLEFT", fontsTitle, "BOTTOMLEFT", 0, -6)
@@ -508,8 +508,8 @@ fontFaceLabel:SetText("Font for all IRS interfaces")
 local fontFaceSelect = CreateFrame("Button", nil, fonts, "BackdropTemplate")
 IRS:StyleButtonFeedback(fontFaceSelect)
 fontFaceSelect:SetBackdrop({bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 1})
-fontFaceSelect:SetBackdropColor(unpack(COLORS.panelAlt))
-fontFaceSelect:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+IRS:SetLayoutColor(fontFaceSelect, "SetBackdropColor", unpack(COLORS.panelAlt))
+IRS:SetLayoutColor(fontFaceSelect, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
 fontFaceSelect:SetWidth(280)
 fontFaceSelect.label = MakeText(fontFaceSelect, "body", COLORS.text, "LEFT")
 fontFaceSelect.label:SetPoint("LEFT", 10, 0)
@@ -532,7 +532,7 @@ for i, option in ipairs(IRS.FONT_FACE_OPTIONS) do
     row.label:SetText(option.label)
     local highlight = row:CreateTexture(nil, "HIGHLIGHT")
     highlight:SetAllPoints()
-    highlight:SetColorTexture(COLORS.gold[1], COLORS.gold[2], COLORS.gold[3], 0.16)
+    IRS:SetLayoutColor(highlight, "SetColorTexture", COLORS.gold[1], COLORS.gold[2], COLORS.gold[3], 0.16)
     row:SetScript("OnClick", function()
         fontFaceMenu:Hide()
         IRS:SetFontFace(key)
@@ -561,6 +561,71 @@ fontFaceMenu:SetScript("OnEvent", function(self)
     for _, focus in ipairs(GetMouseFoci()) do
         while focus do
             if focus == self or focus == fontFaceSelect then return end
+            if focus.IsForbidden and focus:IsForbidden() then break end
+            focus = focus.GetParent and focus:GetParent() or nil
+        end
+    end
+    self:Hide()
+end)
+
+local layoutStyleLabel = MakeText(fonts, "body", COLORS.text, "LEFT")
+layoutStyleLabel:SetText("Layout style")
+local layoutStyleSelect = CreateFrame("Button", nil, fonts, "BackdropTemplate")
+IRS:StyleButtonFeedback(layoutStyleSelect)
+layoutStyleSelect:SetBackdrop({bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 1})
+IRS:SetLayoutColor(layoutStyleSelect, "SetBackdropColor", unpack(COLORS.panelAlt))
+IRS:SetLayoutColor(layoutStyleSelect, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
+layoutStyleSelect:SetWidth(260)
+layoutStyleSelect.label = MakeText(layoutStyleSelect, "body", COLORS.text, "LEFT")
+layoutStyleSelect.label:SetPoint("LEFT", 10, 0)
+layoutStyleSelect.label:SetPoint("RIGHT", -28, 0)
+local layoutStyleArrow = MakeText(layoutStyleSelect, "helper", COLORS.gold, "RIGHT")
+layoutStyleArrow:SetPoint("RIGHT", -10, 0)
+layoutStyleArrow:SetText("v")
+local layoutStyleMenu = MakePanel(UIParent, COLORS.panel)
+IRS:RegisterFormattingRoot(layoutStyleMenu, "main")
+layoutStyleMenu:SetFrameStrata("FULLSCREEN_DIALOG")
+layoutStyleMenu:SetClampedToScreen(true)
+layoutStyleMenu:SetPoint("TOPLEFT", layoutStyleSelect, "BOTTOMLEFT", 0, -2)
+layoutStyleMenu:Hide()
+local layoutStyleRows = {}
+for i, option in ipairs(IRS.LAYOUT_STYLE_OPTIONS) do
+    local key = option.key
+    local row = CreateFrame("Button", nil, layoutStyleMenu)
+    row.label = MakeText(row, "body", COLORS.text, "LEFT")
+    row.label:SetPoint("LEFT", 10, 0)
+    row.label:SetText(option.label)
+    local highlight = row:CreateTexture(nil, "HIGHLIGHT")
+    highlight:SetAllPoints()
+    IRS:SetLayoutColor(highlight, "SetColorTexture", COLORS.gold[1], COLORS.gold[2], COLORS.gold[3], 0.16)
+    row:SetScript("OnClick", function()
+        layoutStyleMenu:Hide()
+        IRS:SetLayoutStyle(key)
+    end)
+    layoutStyleRows[i] = row
+end
+layoutStyleSelect:SetScript("OnClick", function()
+    local rowHeight = math.max(28, IRS:GetFontSize("main", "body") + 14)
+    local menuWidth = layoutStyleSelect:GetWidth()
+    local selected = IRS:GetLayoutStyle()
+    for i, row in ipairs(layoutStyleRows) do
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", 4, -4 - (i - 1) * rowHeight)
+        row:SetPoint("TOPRIGHT", -4, -4 - (i - 1) * rowHeight)
+        row:SetHeight(rowHeight)
+        SetColor(row.label, IRS.LAYOUT_STYLE_OPTIONS[i].key == selected and COLORS.gold or COLORS.text)
+        menuWidth = math.max(menuWidth, row.label:GetStringWidth() + 28)
+    end
+    layoutStyleMenu:SetSize(menuWidth, #layoutStyleRows * rowHeight + 8)
+    layoutStyleMenu:SetShown(not layoutStyleMenu:IsShown())
+end)
+fonts:HookScript("OnHide", function() layoutStyleMenu:Hide() end)
+layoutStyleMenu:SetScript("OnShow", function(self) self:RegisterEvent("GLOBAL_MOUSE_DOWN") end)
+layoutStyleMenu:SetScript("OnHide", function(self) self:UnregisterEvent("GLOBAL_MOUSE_DOWN") end)
+layoutStyleMenu:SetScript("OnEvent", function(self)
+    for _, focus in ipairs(GetMouseFoci()) do
+        while focus do
+            if focus == self or focus == layoutStyleSelect then return end
             if focus.IsForbidden and focus:IsForbidden() then break end
             focus = focus.GetParent and focus:GetParent() or nil
         end
@@ -831,10 +896,18 @@ local function LayoutSettingsForFonts()
     fontsNote:SetPoint("RIGHT", -16, 0)
     fontFaceLabel:ClearAllPoints()
     fontFaceLabel:SetPoint("TOPLEFT", fontsNote, "BOTTOMLEFT", 0, -12)
-    fontFaceLabel:SetPoint("RIGHT", -16, 0)
     fontFaceSelect:ClearAllPoints()
     fontFaceSelect:SetPoint("TOPLEFT", fontFaceLabel, "BOTTOMLEFT", 0, -8)
     fontFaceSelect:SetHeight(math.max(28, bodySize + 14))
+    local selectorWidth = math.max(180, ((body:GetWidth() or 620) - 48) / 2)
+    fontFaceLabel:SetWidth(selectorWidth)
+    fontFaceSelect:SetWidth(selectorWidth)
+    layoutStyleLabel:ClearAllPoints()
+    layoutStyleLabel:SetPoint("TOPLEFT", fontFaceLabel, "TOPLEFT", selectorWidth + 16, 0)
+    layoutStyleLabel:SetWidth(selectorWidth)
+    layoutStyleSelect:ClearAllPoints()
+    layoutStyleSelect:SetPoint("TOPLEFT", layoutStyleLabel, "BOTTOMLEFT", 0, -8)
+    layoutStyleSelect:SetSize(selectorWidth, math.max(28, bodySize + 14))
 
     for _, info in ipairs({
         {mainFontTitle, mainFontDesc, resetMain},
@@ -907,6 +980,7 @@ function IRS:RefreshSettingsPage()
     LayoutSettingsForFonts()
     local _, fontFaceName = IRS:GetFontFace()
     fontFaceSelect.label:SetText(fontFaceName)
+    layoutStyleSelect.label:SetText(IRS:GetLayoutStyleLabel())
 
     minimapCheck:SetChecked(IRS.db.settings.showMinimapButton ~= false)
     miniAutoOpenCheck:SetChecked(IRS.db.settings.autoOpenMiniDashboard == true)
@@ -930,12 +1004,12 @@ function IRS:RefreshSettingsPage()
     local selectedAnchor = IRS:GetMiniDashboardAnchor()
     for anchorKey, button in pairs(anchorButtons) do
         if anchorKey == selectedAnchor then
-            button:SetBackdropColor(unpack(COLORS.panel))
-            button:SetBackdropBorderColor(unpack(COLORS.gold))
+            IRS:SetLayoutColor(button, "SetBackdropColor", unpack(COLORS.panel))
+            IRS:SetLayoutColor(button, "SetBackdropBorderColor", unpack(COLORS.gold))
             SetColor(button.label, COLORS.gold)
         else
-            button:SetBackdropColor(unpack(COLORS.panelAlt))
-            button:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+            IRS:SetLayoutColor(button, "SetBackdropColor", unpack(COLORS.panelAlt))
+            IRS:SetLayoutColor(button, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
             SetColor(button.label, COLORS.text)
         end
     end

@@ -19,7 +19,7 @@ local COLORS = {
 }
 
 local function SetColor(fs, color)
-    fs:SetTextColor(color[1], color[2], color[3], color[4] or 1)
+    IRS:SetLayoutColor(fs, "SetTextColor", color[1], color[2], color[3], color[4] or 1)
 end
 
 local function MakeText(parentFrame, style, color, justify, flags)
@@ -56,8 +56,8 @@ local function MakePanel(parentFrame, bg)
     })
 
     local c = bg or COLORS.panel
-    panel:SetBackdropColor(c[1], c[2], c[3], c[4] or 1)
-    panel:SetBackdropBorderColor(unpack(COLORS.border))
+    IRS:SetLayoutColor(panel, "SetBackdropColor", c[1], c[2], c[3], c[4] or 1)
+    IRS:SetLayoutColor(panel, "SetBackdropBorderColor", unpack(COLORS.border))
     return panel
 end
 
@@ -198,7 +198,7 @@ local function EnsureRow(index)
 
     local row = MakePanel(child, COLORS.row)
     row:SetHeight(48)
-    row:SetBackdropBorderColor(0.13, 0.15, 0.15, 1)
+    IRS:SetLayoutColor(row, "SetBackdropBorderColor", 0.13, 0.15, 0.15, 1)
 
     row.name = MakeText(row, "body", COLORS.goldSoft, "LEFT", "OUTLINE")
     row.name:SetPoint("TOPLEFT", 10, -7)

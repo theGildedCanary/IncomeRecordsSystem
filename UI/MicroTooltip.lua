@@ -31,13 +31,13 @@ function IRS:CreateMicroTooltip()
         local key = "left_" .. (style or "body")
         local l = Text(row, key, style or "body", "LEFT")
         l:SetText(left or "")
-        l:SetTextColor(unpack(leftColor))
+        IRS:SetLayoutColor(l, "SetTextColor", unpack(leftColor))
         l:Show()
         row.left = l
         if right then
             local r = Text(row, "right_body", "body", "RIGHT")
             r:SetText(right)
-            r:SetTextColor(unpack(rightColor))
+            IRS:SetLayoutColor(r, "SetTextColor", unpack(rightColor))
             r:Show()
             row.right = r
         end

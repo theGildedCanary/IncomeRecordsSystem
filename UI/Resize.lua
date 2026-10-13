@@ -76,13 +76,13 @@ local function MakeGrip(parent)
     for i = 1, 3 do
         local h = grip:CreateTexture(nil, "OVERLAY")
         h:SetTexture("Interface/Buttons/WHITE8X8")
-        h:SetVertexColor(0.79, 0.66, 0.39, 0.95)
+        IRS:SetLayoutColor(h, "SetVertexColor", 0.79, 0.66, 0.39, 0.95)
         h:SetSize(4 + ((i - 1) * 4), 1)
         h:SetPoint("BOTTOMRIGHT", -4, 3 + ((i - 1) * 4))
 
         local v = grip:CreateTexture(nil, "OVERLAY")
         v:SetTexture("Interface/Buttons/WHITE8X8")
-        v:SetVertexColor(0.79, 0.66, 0.39, 0.95)
+        IRS:SetLayoutColor(v, "SetVertexColor", 0.79, 0.66, 0.39, 0.95)
         v:SetSize(1, 4 + ((i - 1) * 4))
         v:SetPoint("BOTTOMRIGHT", -(3 + ((i - 1) * 4)), 4)
     end

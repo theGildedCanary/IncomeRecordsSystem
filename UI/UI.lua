@@ -32,7 +32,7 @@ local MEDIA = [[Interface\AddOns\IncomeRecordsSystem\Media\]]
 -- Applies one COLORS entry to a FontString. Keeping this tiny helper avoids
 -- repeating RGBA indexing everywhere.
 local function SetColor(fontString, color)
-    fontString:SetTextColor(color[1], color[2], color[3], color[4] or 1)
+    IRS:SetLayoutColor(fontString, "SetTextColor", color[1], color[2], color[3], color[4] or 1)
 end
 
 -- Creates a consistently styled FontString. Most visible text in IRS starts here.
@@ -64,8 +64,8 @@ local function MakePanel(parent, bgColor)
         edgeSize = 1,
     })
     local c = bgColor or COLORS.panel
-    panel:SetBackdropColor(c[1], c[2], c[3], c[4] or 1)
-    panel:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+    IRS:SetLayoutColor(panel, "SetBackdropColor", c[1], c[2], c[3], c[4] or 1)
+    IRS:SetLayoutColor(panel, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
     return panel
 end
 
@@ -141,8 +141,8 @@ frame:SetBackdrop({
     edgeFile = "Interface/Buttons/WHITE8X8",
     edgeSize = 1,
 })
-frame:SetBackdropColor(unpack(COLORS.bg))
-frame:SetBackdropBorderColor(unpack(COLORS.border))
+IRS:SetLayoutColor(frame, "SetBackdropColor", unpack(COLORS.bg))
+IRS:SetLayoutColor(frame, "SetBackdropBorderColor", unpack(COLORS.border))
 frame:Hide()
 IRS.mainFrame = frame
 IRS:RegisterFormattingRoot(frame, "main")
@@ -164,11 +164,11 @@ header:SetPoint("TOPLEFT", 12, -12)
 header:SetPoint("TOPRIGHT", -12, -12)
 header:SetHeight(64)
 header:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8" })
-header:SetBackdropColor(unpack(COLORS.bg))
+IRS:SetLayoutColor(header, "SetBackdropColor", unpack(COLORS.bg))
 
 local headerLine = header:CreateTexture(nil, "BORDER")
 headerLine:SetTexture("Interface/Buttons/WHITE8X8")
-headerLine:SetVertexColor(unpack(COLORS.border))
+IRS:SetLayoutColor(headerLine, "SetVertexColor", unpack(COLORS.border))
 headerLine:SetHeight(1)
 headerLine:SetPoint("BOTTOMLEFT", 0, 0)
 headerLine:SetPoint("BOTTOMRIGHT", 0, 0)
@@ -205,10 +205,10 @@ local rail = MakePanel(frame, COLORS.bg)
 rail:SetPoint("TOPLEFT", 14, -84)
 rail:SetPoint("BOTTOMLEFT", 14, 14)
 rail:SetWidth(104)
-rail:SetBackdropBorderColor(0, 0, 0, 0)
+IRS:SetLayoutColor(rail, "SetBackdropBorderColor", 0, 0, 0, 0)
 rail.divider = rail:CreateTexture(nil, "BORDER")
 rail.divider:SetTexture("Interface/Buttons/WHITE8X8")
-rail.divider:SetVertexColor(unpack(COLORS.borderSoft))
+IRS:SetLayoutColor(rail.divider, "SetVertexColor", unpack(COLORS.borderSoft))
 rail.divider:SetWidth(1)
 rail.divider:SetPoint("TOPRIGHT", -1, 0)
 rail.divider:SetPoint("BOTTOMRIGHT", -1, 0)
@@ -231,12 +231,12 @@ local function MakeTab(key, label, y)
     button:SetPoint("TOPLEFT", 4, y)
     button:SetSize(96, 34)
     button:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8" })
-    button:SetBackdropColor(0, 0, 0, 0)
-    button:SetBackdropBorderColor(0, 0, 0, 0)
+    IRS:SetLayoutColor(button, "SetBackdropColor", 0, 0, 0, 0)
+    IRS:SetLayoutColor(button, "SetBackdropBorderColor", 0, 0, 0, 0)
 
     button.activeBar = button:CreateTexture(nil, "ARTWORK")
     button.activeBar:SetTexture("Interface/Buttons/WHITE8X8")
-    button.activeBar:SetVertexColor(unpack(COLORS.gold))
+    IRS:SetLayoutColor(button.activeBar, "SetVertexColor", unpack(COLORS.gold))
     button.activeBar:SetWidth(2)
     button.activeBar:SetPoint("TOPLEFT", 0, -5)
     button.activeBar:SetPoint("BOTTOMLEFT", 0, 5)
@@ -310,14 +310,14 @@ local status = MakePanel(dashboard, COLORS.panelAlt)
 status:SetPoint("TOPLEFT", 0, -29)
 status:SetPoint("TOPRIGHT", 0, -29)
 status:SetHeight(58)
-status:SetBackdropColor(COLORS.green[1], COLORS.green[2], COLORS.green[3], 0.12)
-status:SetBackdropBorderColor(COLORS.green[1], COLORS.green[2], COLORS.green[3], 0.58)
+IRS:SetLayoutColor(status, "SetBackdropColor", COLORS.green[1], COLORS.green[2], COLORS.green[3], 0.12)
+IRS:SetLayoutColor(status, "SetBackdropBorderColor", COLORS.green[1], COLORS.green[2], COLORS.green[3], 0.58)
 
 status.marker = status:CreateTexture(nil, "ARTWORK")
 status.marker:SetTexture("Interface/Buttons/WHITE8X8")
 status.marker:SetSize(7, 7)
 status.marker:SetPoint("TOPLEFT", 12, -16)
-status.marker:SetVertexColor(unpack(COLORS.green))
+IRS:SetLayoutColor(status.marker, "SetVertexColor", unpack(COLORS.green))
 
 status.title = MakeText(status, 13, COLORS.green, "LEFT")
 status.title:SetPoint("TOPLEFT", 28, -10)
@@ -342,7 +342,7 @@ local function MakePeriodCard(parent, x, width, heading)
     if x > 0 then
         card.separator = card:CreateTexture(nil, "BORDER")
         card.separator:SetTexture("Interface/Buttons/WHITE8X8")
-        card.separator:SetVertexColor(unpack(COLORS.borderSoft))
+        IRS:SetLayoutColor(card.separator, "SetVertexColor", unpack(COLORS.borderSoft))
         card.separator:SetWidth(1)
         card.separator:SetPoint("TOPLEFT", 0, -7)
         card.separator:SetPoint("BOTTOMLEFT", 0, 7)
@@ -379,7 +379,7 @@ chartTitle:SetText("DAILY EARNINGS (LAST 7 DAYS)")
 
 local titleUnderline = chartTitle:GetParent():CreateTexture(nil, "BORDER")
 titleUnderline:SetTexture("Interface/Buttons/WHITE8X8")
-titleUnderline:SetVertexColor(unpack(COLORS.border))
+IRS:SetLayoutColor(titleUnderline, "SetVertexColor", unpack(COLORS.border))
 titleUnderline:SetHeight(1)
 titleUnderline:SetPoint("TOPLEFT", dashboard, "TOPLEFT", 0, -250)
 titleUnderline:SetPoint("TOPRIGHT", dashboard, "TOPRIGHT", -2, -250)
@@ -394,7 +394,7 @@ chart.grid = {}
 for i = 1, 4 do
     local line = chart:CreateTexture(nil, "BORDER")
     line:SetTexture("Interface/Buttons/WHITE8X8")
-    line:SetVertexColor(0.27, 0.23, 0.17, 0.75)
+    IRS:SetLayoutColor(line, "SetVertexColor", 0.27, 0.23, 0.17, 0.75)
     line:SetHeight(1)
     line:SetPoint("LEFT", 52, 0)
     line:SetPoint("RIGHT", -12, 0)
@@ -423,7 +423,7 @@ for i = 1, 7 do
     bar:SetTexture("Interface/Buttons/WHITE8X8")
     bar:SetWidth(52)
     bar:SetPoint("BOTTOM", 0, 25)
-    bar:SetVertexColor(unpack(COLORS.cyan))
+    IRS:SetLayoutColor(bar, "SetVertexColor", unpack(COLORS.cyan))
 
     local day = MakeText(slot, 9, COLORS.text, "CENTER")
     day:SetPoint("BOTTOM", 0, 3)
@@ -438,7 +438,7 @@ overviewTitle:SetText("ACCOUNT OVERVIEW")
 
 local overviewLine = dashboard:CreateTexture(nil, "BORDER")
 overviewLine:SetTexture("Interface/Buttons/WHITE8X8")
-overviewLine:SetVertexColor(unpack(COLORS.border))
+IRS:SetLayoutColor(overviewLine, "SetVertexColor", unpack(COLORS.border))
 overviewLine:SetHeight(1)
 overviewLine:SetPoint("TOPLEFT", dashboard, "TOPLEFT", 0, -465)
 overviewLine:SetPoint("TOPRIGHT", dashboard, "TOPRIGHT", -2, -465)
@@ -461,7 +461,7 @@ local function BuildList(panel, heading, rows)
 
     panel.headerLine = panel:CreateTexture(nil, "BORDER")
     panel.headerLine:SetTexture("Interface/Buttons/WHITE8X8")
-    panel.headerLine:SetVertexColor(unpack(COLORS.borderSoft))
+    IRS:SetLayoutColor(panel.headerLine, "SetVertexColor", unpack(COLORS.borderSoft))
     panel.headerLine:SetHeight(1)
     panel.headerLine:SetPoint("TOPLEFT", 0, -27)
     panel.headerLine:SetPoint("TOPRIGHT", 0, -27)
@@ -555,8 +555,8 @@ local function MakeProjectButton(parent, text, x, y, w, onClick)
     b:SetPoint("TOPLEFT", x, y)
     b:SetSize(w, 28)
     b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 1 })
-    b:SetBackdropColor(unpack(COLORS.panelAlt))
-    b:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+    IRS:SetLayoutColor(b, "SetBackdropColor", unpack(COLORS.panelAlt))
+    IRS:SetLayoutColor(b, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
     b.label = MakeText(b, 9, COLORS.text, "CENTER")
     b.label:SetAllPoints()
     b.label:SetText(text)
@@ -573,7 +573,7 @@ projectAllocationTab:ClearAllPoints()
 projectAllocationTab:SetPoint("LEFT", projectManagementTab, "RIGHT", 8, 0)
 
 local projectTabsDivider = projectsPage:CreateTexture(nil, "ARTWORK")
-projectTabsDivider:SetColorTexture(unpack(COLORS.borderSoft))
+IRS:SetLayoutColor(projectTabsDivider, "SetColorTexture", unpack(COLORS.borderSoft))
 projectTabsDivider:SetHeight(2)
 projectTabsDivider:SetPoint("TOPLEFT", projectsPage, "TOPLEFT", 4, -88)
 projectTabsDivider:SetPoint("TOPRIGHT", projectsPage, "TOPRIGHT", -4, -88)
@@ -601,12 +601,12 @@ function IRS:SetProjectsSection(section)
     projectManagementView:SetShown(not allocationActive)
     projectAllocationView:SetShown(allocationActive)
 
-    projectManagementTab:SetBackdropColor(unpack(allocationActive and COLORS.panel or COLORS.panelAlt))
-    projectManagementTab:SetBackdropBorderColor(unpack(allocationActive and COLORS.border or COLORS.goldSoft))
+    IRS:SetLayoutColor(projectManagementTab, "SetBackdropColor", unpack(allocationActive and COLORS.panel or COLORS.panelAlt))
+    IRS:SetLayoutColor(projectManagementTab, "SetBackdropBorderColor", unpack(allocationActive and COLORS.border or COLORS.goldSoft))
     SetColor(projectManagementTab.label, allocationActive and COLORS.text or COLORS.gold)
 
-    projectAllocationTab:SetBackdropColor(unpack(allocationActive and COLORS.panelAlt or COLORS.panel))
-    projectAllocationTab:SetBackdropBorderColor(unpack(allocationActive and COLORS.goldSoft or COLORS.border))
+    IRS:SetLayoutColor(projectAllocationTab, "SetBackdropColor", unpack(allocationActive and COLORS.panelAlt or COLORS.panel))
+    IRS:SetLayoutColor(projectAllocationTab, "SetBackdropBorderColor", unpack(allocationActive and COLORS.goldSoft or COLORS.border))
     SetColor(projectAllocationTab.label, allocationActive and COLORS.gold or COLORS.text)
 
     if allocationActive then
@@ -700,12 +700,12 @@ local function EnsureProjectPopupRow(index)
     IRS:StyleButtonFeedback(b)
     b:SetHeight(26)
     b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 1 })
-    b:SetBackdropColor(unpack(COLORS.panelAlt))
-    b:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+    IRS:SetLayoutColor(b, "SetBackdropColor", unpack(COLORS.panelAlt))
+    IRS:SetLayoutColor(b, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
     b.text = MakeText(b, 9, COLORS.text, "LEFT")
     b.text:SetPoint("LEFT", 8, 0); b.text:SetPoint("RIGHT", -6, 0)
-    b:SetScript("OnEnter", function(self) self:SetBackdropColor(unpack(COLORS.panel)) end)
-    b:SetScript("OnLeave", function(self) self:SetBackdropColor(unpack(COLORS.panelAlt)) end)
+    b:SetScript("OnEnter", function(self) IRS:SetLayoutColor(self, "SetBackdropColor", unpack(COLORS.panel)) end)
+    b:SetScript("OnLeave", function(self) IRS:SetLayoutColor(self, "SetBackdropColor", unpack(COLORS.panelAlt)) end)
     projectPopup.rows[index] = b
     return b
 end
@@ -749,7 +749,7 @@ for i, item in ipairs(sourceChoices) do
     IRS:StyleButtonFeedback(b)
     b:SetPoint("TOPLEFT", 4, -4 - ((i - 1) * 28)); b:SetSize(182, 26)
     b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 1 })
-    b:SetBackdropColor(unpack(COLORS.panelAlt)); b:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+    IRS:SetLayoutColor(b, "SetBackdropColor", unpack(COLORS.panelAlt)); IRS:SetLayoutColor(b, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
     b.text = MakeText(b, 9, COLORS.text, "LEFT"); b.text:SetPoint("LEFT", 8, 0); b.text:SetText(item.label)
     b:SetScript("OnClick", function()
         projectSourceType = item.key
@@ -779,10 +779,10 @@ local function EnsureDetailRow(index)
     IRS:StyleButtonFeedback(b)
     b:SetHeight(25)
     b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 1 })
-    b:SetBackdropColor(unpack(COLORS.panelAlt)); b:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+    IRS:SetLayoutColor(b, "SetBackdropColor", unpack(COLORS.panelAlt)); IRS:SetLayoutColor(b, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
     b.text = MakeText(b, 9, COLORS.text, "LEFT"); b.text:SetPoint("LEFT", 8, 0); b.text:SetPoint("RIGHT", -6, 0)
-    b:SetScript("OnEnter", function(self) self:SetBackdropColor(unpack(COLORS.panel)) end)
-    b:SetScript("OnLeave", function(self) self:SetBackdropColor(unpack(COLORS.panelAlt)) end)
+    b:SetScript("OnEnter", function(self) IRS:SetLayoutColor(self, "SetBackdropColor", unpack(COLORS.panel)) end)
+    b:SetScript("OnLeave", function(self) IRS:SetLayoutColor(self, "SetBackdropColor", unpack(COLORS.panelAlt)) end)
     sourceDetailPopup.rows[index] = b
     return b
 end
@@ -834,7 +834,7 @@ end)
 
 -- Project summary
 local projectSummary = MakePanel(projectManagementView, COLORS.bg)
-projectSummary:SetBackdropBorderColor(0, 0, 0, 0)
+IRS:SetLayoutColor(projectSummary, "SetBackdropBorderColor", 0, 0, 0, 0)
 projectSummary:SetPoint("TOPLEFT", 4, -232); projectSummary:SetPoint("TOPRIGHT", -4, -232); projectSummary:SetHeight(126)
 projectSummary.cards = {}
 local summaryLabels = {"CURRENT ALLOCATED", "STILL NEEDED", "DAILY NEEDED", "TIME REMAINING"}
@@ -847,15 +847,15 @@ for i, label in ipairs(summaryLabels) do
     projectSummary.cards[i] = card
 end
 local progressBG = projectSummary:CreateTexture(nil, "BACKGROUND")
-progressBG:SetTexture("Interface/Buttons/WHITE8X8"); progressBG:SetVertexColor(0.08,0.09,0.09,1)
+progressBG:SetTexture("Interface/Buttons/WHITE8X8"); IRS:SetLayoutColor(progressBG, "SetVertexColor", 0.08,0.09,0.09,1)
 progressBG:SetPoint("BOTTOMLEFT", 14, 13); progressBG:SetPoint("BOTTOMRIGHT", -14, 13); progressBG:SetHeight(18)
 local progressBar = projectSummary:CreateTexture(nil, "ARTWORK")
-progressBar:SetTexture("Interface/Buttons/WHITE8X8"); progressBar:SetVertexColor(unpack(COLORS.cyan)); progressBar:SetPoint("BOTTOMLEFT", progressBG, "BOTTOMLEFT", 0, 0); progressBar:SetHeight(18)
+progressBar:SetTexture("Interface/Buttons/WHITE8X8"); IRS:SetLayoutColor(progressBar, "SetVertexColor", unpack(COLORS.cyan)); progressBar:SetPoint("BOTTOMLEFT", progressBG, "BOTTOMLEFT", 0, 0); progressBar:SetHeight(18)
 local progressText = MakeText(projectSummary, 8, COLORS.text, "CENTER"); progressText:SetPoint("CENTER", progressBG, "CENTER", 0, 0)
 
 -- Daily tracker and graph
 local dailyPanel = MakePanel(projectManagementView, COLORS.bg)
-dailyPanel:SetBackdropBorderColor(0, 0, 0, 0)
+IRS:SetLayoutColor(dailyPanel, "SetBackdropBorderColor", 0, 0, 0, 0)
 local dailyTitle = MakeText(dailyPanel, 13, COLORS.goldSoft, "LEFT"); dailyTitle:SetPoint("TOPLEFT", 12, -10); dailyTitle:SetText("DAILY GOLD TRACKER")
 local dailySub = MakeText(dailyPanel, 8, COLORS.muted, "LEFT"); dailySub:SetPoint("TOPLEFT", dailyTitle, "BOTTOMLEFT", 0, -3); dailySub:SetText("Shared IRS source history within this project window")
 local dailyHeader = CreateFrame("Frame", nil, dailyPanel)
@@ -876,7 +876,7 @@ local function EnsureDailyRow(index)
     row.start=MakeText(row,9,COLORS.text,"RIGHT"); row.start:SetPoint("LEFT",92,0); row.start:SetWidth(84)
     row.ending=MakeText(row,9,COLORS.text,"RIGHT"); row.ending:SetPoint("LEFT",183,0); row.ending:SetWidth(84)
     row.change=MakeText(row,9,COLORS.gold,"RIGHT"); row.change:SetPoint("LEFT",274,0); row.change:SetWidth(96)
-    local line=row:CreateTexture(nil,"BORDER"); line:SetTexture("Interface/Buttons/WHITE8X8"); line:SetVertexColor(0.11,0.12,0.12,1); line:SetHeight(1); line:SetPoint("BOTTOMLEFT",0,0); line:SetPoint("BOTTOMRIGHT",0,0)
+    local line=row:CreateTexture(nil,"BORDER"); line:SetTexture("Interface/Buttons/WHITE8X8"); IRS:SetLayoutColor(line, "SetVertexColor", 0.11,0.12,0.12,1); line:SetHeight(1); line:SetPoint("BOTTOMLEFT",0,0); line:SetPoint("BOTTOMRIGHT",0,0)
     dailyPanel.rows[index]=row; return row
 end
 local function LayoutDailyTrackerColumns()
@@ -927,7 +927,7 @@ local function LayoutDailyTrackerColumns()
 end
 
 local graphPanel = MakePanel(projectManagementView, COLORS.bg)
-graphPanel:SetBackdropBorderColor(0, 0, 0, 0)
+IRS:SetLayoutColor(graphPanel, "SetBackdropBorderColor", 0, 0, 0, 0)
 graphPanel:SetPoint("TOPLEFT", 4, -370)
 graphPanel:SetPoint("TOPRIGHT", -4, -370)
 graphPanel:SetHeight(450)
@@ -970,8 +970,8 @@ end
 local graph = CreateFrame("Frame", nil, graphPanel)
 graph:SetPoint("TOPLEFT", 50, -62)
 graph:SetPoint("BOTTOMRIGHT", -16, 108)
-local graphAxis = graphPanel:CreateTexture(nil,"BORDER"); graphAxis:SetTexture("Interface/Buttons/WHITE8X8"); graphAxis:SetVertexColor(0.25,0.28,0.28,1); graphAxis:SetHeight(1); graphAxis:SetPoint("BOTTOMLEFT",graph,"BOTTOMLEFT",0,0); graphAxis:SetPoint("BOTTOMRIGHT",graph,"BOTTOMRIGHT",0,0)
-local graphLeftAxis = graphPanel:CreateTexture(nil,"BORDER"); graphLeftAxis:SetTexture("Interface/Buttons/WHITE8X8"); graphLeftAxis:SetVertexColor(0.25,0.28,0.28,1); graphLeftAxis:SetWidth(1); graphLeftAxis:SetPoint("TOPLEFT",graph,"TOPLEFT",0,0); graphLeftAxis:SetPoint("BOTTOMLEFT",graph,"BOTTOMLEFT",0,0)
+local graphAxis = graphPanel:CreateTexture(nil,"BORDER"); graphAxis:SetTexture("Interface/Buttons/WHITE8X8"); IRS:SetLayoutColor(graphAxis, "SetVertexColor", 0.25,0.28,0.28,1); graphAxis:SetHeight(1); graphAxis:SetPoint("BOTTOMLEFT",graph,"BOTTOMLEFT",0,0); graphAxis:SetPoint("BOTTOMRIGHT",graph,"BOTTOMRIGHT",0,0)
+local graphLeftAxis = graphPanel:CreateTexture(nil,"BORDER"); graphLeftAxis:SetTexture("Interface/Buttons/WHITE8X8"); IRS:SetLayoutColor(graphLeftAxis, "SetVertexColor", 0.25,0.28,0.28,1); graphLeftAxis:SetWidth(1); graphLeftAxis:SetPoint("TOPLEFT",graph,"TOPLEFT",0,0); graphLeftAxis:SetPoint("BOTTOMLEFT",graph,"BOTTOMLEFT",0,0)
 local graphTopLabel = MakeText(graphPanel,8,COLORS.muted,"RIGHT"); graphTopLabel:SetPoint("TOPRIGHT",graph,"TOPLEFT",-6,2); graphTopLabel:SetWidth(46)
 local graphBottomLabel = MakeText(graphPanel,8,COLORS.muted,"RIGHT"); graphBottomLabel:SetPoint("BOTTOMRIGHT",graph,"BOTTOMLEFT",-6,-2); graphBottomLabel:SetWidth(46); graphBottomLabel:SetText("0g")
 
@@ -1002,7 +1002,7 @@ for i = 1, 10 do
 
     local tick = graphPanel:CreateTexture(nil, "BORDER")
     tick:SetTexture("Interface/Buttons/WHITE8X8")
-    tick:SetVertexColor(0.25, 0.28, 0.28, 1)
+    IRS:SetLayoutColor(tick, "SetVertexColor", 0.25, 0.28, 0.28, 1)
     tick:SetSize(1, 6)
     tick:Hide()
     graphPanel.xTicks[i] = tick
@@ -1020,17 +1020,17 @@ for i = 1, 10 do
 
     local guide = graphPanel:CreateTexture(nil, "BACKGROUND")
     guide:SetTexture("Interface/Buttons/WHITE8X8")
-    guide:SetVertexColor(0.18, 0.20, 0.20, 0.55)
+    IRS:SetLayoutColor(guide, "SetVertexColor", 0.18, 0.20, 0.20, 0.55)
     guide:SetHeight(1)
     guide:Hide()
     graphPanel.yGuides[i] = guide
 end
 
 graphPanel.requiredLine = graph:CreateLine(nil,"ARTWORK")
-graphPanel.requiredLine:SetThickness(2); graphPanel.requiredLine:SetColorTexture(COLORS.gold[1],COLORS.gold[2],COLORS.gold[3],1)
+graphPanel.requiredLine:SetThickness(2); IRS:SetLayoutColor(graphPanel.requiredLine, "SetColorTexture", COLORS.gold[1],COLORS.gold[2],COLORS.gold[3],1)
 graphPanel.actualLines = {}
 for i=1,64 do
-    local line=graph:CreateLine(nil,"ARTWORK"); line:SetThickness(2); line:SetColorTexture(COLORS.cyan[1],COLORS.cyan[2],COLORS.cyan[3],1); line:Hide(); graphPanel.actualLines[i]=line
+    local line=graph:CreateLine(nil,"ARTWORK"); line:SetThickness(2); IRS:SetLayoutColor(line, "SetColorTexture", COLORS.cyan[1],COLORS.cyan[2],COLORS.cyan[3],1); line:Hide(); graphPanel.actualLines[i]=line
 end
 
 -- Human-readable name for a project's internal sourceType key.
@@ -1225,8 +1225,8 @@ function IRS:RefreshProjectsPage(preserveForm)
         end
 
         for _, button in pairs(graphPanel.intervalButtons) do
-            button:SetBackdropColor(unpack(COLORS.panelAlt))
-            button:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+            IRS:SetLayoutColor(button, "SetBackdropColor", unpack(COLORS.panelAlt))
+            IRS:SetLayoutColor(button, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
             SetColor(button.label, COLORS.text)
         end
         return
@@ -1270,12 +1270,12 @@ function IRS:RefreshProjectsPage(preserveForm)
     local graphInterval = IRS:GetProjectGraphInterval(project)
     for intervalKey, button in pairs(graphPanel.intervalButtons) do
         if intervalKey == graphInterval then
-            button:SetBackdropColor(0.18, 0.13, 0.05, 1)
-            button:SetBackdropBorderColor(unpack(COLORS.goldSoft))
+            IRS:SetLayoutColor(button, "SetBackdropColor", 0.18, 0.13, 0.05, 1)
+            IRS:SetLayoutColor(button, "SetBackdropBorderColor", unpack(COLORS.goldSoft))
             SetColor(button.label, COLORS.gold)
         else
-            button:SetBackdropColor(unpack(COLORS.panelAlt))
-            button:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+            IRS:SetLayoutColor(button, "SetBackdropColor", unpack(COLORS.panelAlt))
+            IRS:SetLayoutColor(button, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
             SetColor(button.label, COLORS.text)
         end
     end
@@ -1349,21 +1349,21 @@ function IRS:RefreshProjectsPage(preserveForm)
                 guide:SetPoint("RIGHT", graph, "BOTTOMRIGHT", 0, y)
 
                 if tickData.endpoint then
-                    guide:SetVertexColor(
+                    IRS:SetLayoutColor(guide, "SetVertexColor",
                         COLORS.goldSoft[1],
                         COLORS.goldSoft[2],
                         COLORS.goldSoft[3],
                         0.35
                     )
                 elseif tickData.reached then
-                    guide:SetVertexColor(
+                    IRS:SetLayoutColor(guide, "SetVertexColor",
                         COLORS.green[1],
                         COLORS.green[2],
                         COLORS.green[3],
                         0.22
                     )
                 else
-                    guide:SetVertexColor(0.18, 0.20, 0.20, 0.55)
+                    IRS:SetLayoutColor(guide, "SetVertexColor", 0.18, 0.20, 0.20, 0.55)
                 end
 
                 label:Show()
@@ -1540,7 +1540,7 @@ local function EnsureCharacterRow(index)
     if charactersPage.rows[index] then return charactersPage.rows[index] end
     local row = MakePanel(charScrollChild, COLORS.bg)
     row:SetHeight(42)
-    row:SetBackdropBorderColor(0.12, 0.14, 0.14, 1)
+    IRS:SetLayoutColor(row, "SetBackdropBorderColor", 0.12, 0.14, 0.14, 1)
 
     row.check = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
     row.check:SetSize(25, 25)
@@ -1570,7 +1570,7 @@ local function EnsureCharacterRow(index)
     row.statusMarker:SetTexture("Interface/Buttons/WHITE8X8")
     row.statusMarker:SetSize(6, 6)
     row.statusMarker:SetPoint("LEFT", 707, 0)
-    row.statusMarker:SetVertexColor(unpack(COLORS.green))
+    IRS:SetLayoutColor(row.statusMarker, "SetVertexColor", unpack(COLORS.green))
 
     row.status = MakeText(row, 10, COLORS.green, "LEFT")
     row.status:SetPoint("LEFT", 724, 0)
@@ -1620,8 +1620,8 @@ IRS:StyleButtonFeedback(scopeButton)
 scopeButton:SetPoint("TOPLEFT", 4, -82)
 scopeButton:SetSize(250, 28)
 scopeButton:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 2 })
-scopeButton:SetBackdropColor(unpack(COLORS.panelAlt))
-scopeButton:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+IRS:SetLayoutColor(scopeButton, "SetBackdropColor", unpack(COLORS.panelAlt))
+IRS:SetLayoutColor(scopeButton, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
 scopeButton.text = MakeText(scopeButton, 10, COLORS.text, "LEFT")
 scopeButton.text:SetPoint("LEFT", 10, 0)
 scopeButton.text:SetPoint("RIGHT", -24, 0)
@@ -1642,8 +1642,8 @@ local function MakeSmallToggle(parent, text, x, width, onClick)
     b:SetPoint("TOPLEFT", x, -82)
     b:SetSize(width, 28)
     b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 2 })
-    b:SetBackdropColor(unpack(COLORS.panelAlt))
-    b:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+    IRS:SetLayoutColor(b, "SetBackdropColor", unpack(COLORS.panelAlt))
+    IRS:SetLayoutColor(b, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
     b.label = MakeText(b, 9, COLORS.text, "CENTER")
     b.label:SetAllPoints()
     b.label:SetText(text)
@@ -1666,7 +1666,7 @@ reportViewButtons.sources = MakeSmallToggle(reportsPage, "SOURCES", 688, 76, fun
 reportViewButtons.transactions = MakeSmallToggle(reportsPage, "LOG", 768, 76, function() reportView = "transactions"; IRS:RefreshReportsPage() end)
 
 local reportPanel = MakePanel(reportsPage, COLORS.bg)
-reportPanel:SetBackdropBorderColor(0, 0, 0, 0)
+IRS:SetLayoutColor(reportPanel, "SetBackdropBorderColor", 0, 0, 0, 0)
 reportPanel:SetPoint("TOPLEFT", 4, -124)
 reportPanel:SetPoint("BOTTOMRIGHT", -4, 4)
 
@@ -1691,13 +1691,13 @@ local function EnsureScopeRow(index)
     IRS:StyleButtonFeedback(b)
     b:SetHeight(24)
     b:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 1 })
-    b:SetBackdropColor(unpack(COLORS.panelAlt))
-    b:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+    IRS:SetLayoutColor(b, "SetBackdropColor", unpack(COLORS.panelAlt))
+    IRS:SetLayoutColor(b, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
     b.text = MakeText(b, 9, COLORS.text, "LEFT")
     b.text:SetPoint("LEFT", 8, 0)
     b.text:SetPoint("RIGHT", -6, 0)
-    b:SetScript("OnEnter", function(self) self:SetBackdropColor(unpack(COLORS.panel)) end)
-    b:SetScript("OnLeave", function(self) self:SetBackdropColor(unpack(COLORS.panelAlt)) end)
+    b:SetScript("OnEnter", function(self) IRS:SetLayoutColor(self, "SetBackdropColor", unpack(COLORS.panel)) end)
+    b:SetScript("OnLeave", function(self) IRS:SetLayoutColor(self, "SetBackdropColor", unpack(COLORS.panelAlt)) end)
     scopePopup.rows[index] = b
     return b
 end
@@ -1742,7 +1742,7 @@ local historyScopeText = MakeText(historyView, 9, COLORS.muted, "RIGHT")
 historyScopeText:SetPoint("TOPRIGHT", -14, -15)
 
 local historyHeader = MakePanel(historyView, COLORS.panelAlt)
-historyHeader:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+IRS:SetLayoutColor(historyHeader, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
 historyHeader:SetPoint("TOPLEFT", 12, -42)
 historyHeader:SetPoint("TOPRIGHT", -28, -42)
 historyHeader:SetHeight(26)
@@ -1764,14 +1764,14 @@ local function EnsureHistoryRow(index)
     local row = CreateFrame("Frame", nil, historyChild, "BackdropTemplate")
     row:SetHeight(27)
     row:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 1 })
-    row:SetBackdropColor(0.21, 0.16, 0.10, 0.30)
-    row:SetBackdropBorderColor(0, 0, 0, 0)
+    IRS:SetLayoutColor(row, "SetBackdropColor", 0.21, 0.16, 0.10, 0.30)
+    IRS:SetLayoutColor(row, "SetBackdropBorderColor", 0, 0, 0, 0)
     row.period = MakeText(row, 10, COLORS.text, "LEFT")
     row.period:SetPoint("LEFT", 10, 0)
     row.amount = MakeText(row, 10, COLORS.goldSoft, "RIGHT")
     row.amount:SetPoint("RIGHT", -10, 0)
     local line = row:CreateTexture(nil, "BORDER")
-    line:SetTexture("Interface/Buttons/WHITE8X8"); line:SetVertexColor(unpack(COLORS.borderSoft)); line:SetHeight(1)
+    line:SetTexture("Interface/Buttons/WHITE8X8"); IRS:SetLayoutColor(line, "SetVertexColor", unpack(COLORS.borderSoft)); line:SetHeight(1)
     line:SetPoint("BOTTOMLEFT", 0, 0); line:SetPoint("BOTTOMRIGHT", 0, 0)
     historyView.rows[index] = row
     return row
@@ -1791,7 +1791,7 @@ metricsView.cards = {}
 local metricLabels = {"BEST DAY", "DAILY AVERAGE", "WEEKLY AVERAGE", "MONTHLY AVERAGE", "TOTAL RECORDED"}
 for i, label in ipairs(metricLabels) do
     local card = MakePanel(metricsView, COLORS.panelAlt)
-    card:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+    IRS:SetLayoutColor(card, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
     local col = (i - 1) % 3
     local row = math.floor((i - 1) / 3)
     card:SetPoint("TOPLEFT", 14 + (col * 260), -55 - (row * 135))
@@ -1829,17 +1829,17 @@ for i, info in ipairs(sourceLabels) do
     row:SetSize(780, 54)
     row:SetPoint("TOPLEFT", 14, -65 - ((i - 1) * 58))
     row:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8", edgeFile = "Interface/Buttons/WHITE8X8", edgeSize = 2 })
-    row:SetBackdropColor(unpack(COLORS.panelAlt))
-    row:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+    IRS:SetLayoutColor(row, "SetBackdropColor", unpack(COLORS.panelAlt))
+    IRS:SetLayoutColor(row, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
     row.label = MakeText(row, 10, COLORS.text, "LEFT")
     row.label:SetPoint("TOPLEFT", 8, -6); row.label:SetText(info[1])
     row.value = MakeText(row, 11, COLORS.goldSoft, "RIGHT")
     row.value:SetPoint("TOPRIGHT", -8, -6)
     row.barBG = row:CreateTexture(nil, "BACKGROUND")
-    row.barBG:SetTexture("Interface/Buttons/WHITE8X8"); row.barBG:SetVertexColor(0.15, 0.115, 0.070, 0.72)
+    row.barBG:SetTexture("Interface/Buttons/WHITE8X8"); IRS:SetLayoutColor(row.barBG, "SetVertexColor", 0.15, 0.115, 0.070, 0.72)
     row.barBG:SetPoint("BOTTOMLEFT", 8, 10); row.barBG:SetSize(764, 10)
     row.bar = row:CreateTexture(nil, "ARTWORK")
-    row.bar:SetTexture("Interface/Buttons/WHITE8X8"); row.bar:SetVertexColor(unpack(COLORS.cyan))
+    row.bar:SetTexture("Interface/Buttons/WHITE8X8"); IRS:SetLayoutColor(row.bar, "SetVertexColor", unpack(COLORS.cyan))
     row.bar:SetPoint("BOTTOMLEFT", 8, 10); row.bar:SetHeight(10)
     row.statKey = info[2]
     sourcesView.rows[i] = row
@@ -1860,7 +1860,7 @@ transactionView.note:SetText(
 )
 
 transactionView.header = MakePanel(transactionView, COLORS.panelAlt)
-transactionView.header:SetBackdropBorderColor(unpack(COLORS.borderSoft))
+IRS:SetLayoutColor(transactionView.header, "SetBackdropBorderColor", unpack(COLORS.borderSoft))
 transactionView.header:SetPoint("TOPLEFT", 12, -58)
 transactionView.header:SetPoint("TOPRIGHT", -28, -58)
 transactionView.header:SetHeight(26)
@@ -1913,8 +1913,8 @@ local function EnsureTransactionRow(index)
         edgeFile = "Interface/Buttons/WHITE8X8",
         edgeSize = 1,
     })
-    row:SetBackdropColor(0.21, 0.16, 0.10, 0.30)
-    row:SetBackdropBorderColor(0, 0, 0, 0)
+    IRS:SetLayoutColor(row, "SetBackdropColor", 0.21, 0.16, 0.10, 0.30)
+    IRS:SetLayoutColor(row, "SetBackdropBorderColor", 0, 0, 0, 0)
     row:EnableMouse(true)
 
     row.time = MakeText(row, 9, COLORS.text, "LEFT")
@@ -1925,7 +1925,7 @@ local function EnsureTransactionRow(index)
 
     local line = row:CreateTexture(nil, "BORDER")
     line:SetTexture("Interface/Buttons/WHITE8X8")
-    line:SetVertexColor(unpack(COLORS.borderSoft))
+    IRS:SetLayoutColor(line, "SetVertexColor", unpack(COLORS.borderSoft))
     line:SetHeight(1)
     line:SetPoint("BOTTOMLEFT", 0, 0)
     line:SetPoint("BOTTOMRIGHT", 0, 0)
@@ -2066,19 +2066,19 @@ LayoutHelpCommands()
 -- current state color so the banner reads as one soft tinted strip.
 local function SetSurveillanceState(state, titleText, detailText)
     if state == "paused" then
-        status:SetBackdropColor(COLORS.red[1], COLORS.red[2], COLORS.red[3], 0.12)
-        status:SetBackdropBorderColor(COLORS.red[1], COLORS.red[2], COLORS.red[3], 0.62)
-        status.marker:SetVertexColor(unpack(COLORS.red))
+        IRS:SetLayoutColor(status, "SetBackdropColor", COLORS.red[1], COLORS.red[2], COLORS.red[3], 0.12)
+        IRS:SetLayoutColor(status, "SetBackdropBorderColor", COLORS.red[1], COLORS.red[2], COLORS.red[3], 0.62)
+        IRS:SetLayoutColor(status.marker, "SetVertexColor", unpack(COLORS.red))
         SetColor(status.title, COLORS.red)
     elseif state == "partial" then
-        status:SetBackdropColor(COLORS.amber[1], COLORS.amber[2], COLORS.amber[3], 0.12)
-        status:SetBackdropBorderColor(COLORS.amber[1], COLORS.amber[2], COLORS.amber[3], 0.62)
-        status.marker:SetVertexColor(unpack(COLORS.amber))
+        IRS:SetLayoutColor(status, "SetBackdropColor", COLORS.amber[1], COLORS.amber[2], COLORS.amber[3], 0.12)
+        IRS:SetLayoutColor(status, "SetBackdropBorderColor", COLORS.amber[1], COLORS.amber[2], COLORS.amber[3], 0.62)
+        IRS:SetLayoutColor(status.marker, "SetVertexColor", unpack(COLORS.amber))
         SetColor(status.title, COLORS.amber)
     else
-        status:SetBackdropColor(COLORS.green[1], COLORS.green[2], COLORS.green[3], 0.12)
-        status:SetBackdropBorderColor(COLORS.green[1], COLORS.green[2], COLORS.green[3], 0.58)
-        status.marker:SetVertexColor(unpack(COLORS.green))
+        IRS:SetLayoutColor(status, "SetBackdropColor", COLORS.green[1], COLORS.green[2], COLORS.green[3], 0.12)
+        IRS:SetLayoutColor(status, "SetBackdropBorderColor", COLORS.green[1], COLORS.green[2], COLORS.green[3], 0.58)
+        IRS:SetLayoutColor(status.marker, "SetVertexColor", unpack(COLORS.green))
         SetColor(status.title, COLORS.green)
     end
 
@@ -2194,10 +2194,10 @@ local function RefreshChart()
 
         if amount < 0 then
             ui.bar:SetPoint("TOP", ui.slot, "BOTTOM", 0, zeroInSlot)
-            ui.bar:SetVertexColor(unpack(COLORS.red))
+            IRS:SetLayoutColor(ui.bar, "SetVertexColor", unpack(COLORS.red))
         else
             ui.bar:SetPoint("BOTTOM", ui.slot, "BOTTOM", 0, zeroInSlot)
-            ui.bar:SetVertexColor(unpack(COLORS.cyan))
+            IRS:SetLayoutColor(ui.bar, "SetVertexColor", unpack(COLORS.cyan))
         end
 
         ui.amount:SetText(FormatGold(amount))
@@ -2237,11 +2237,11 @@ function IRS:RefreshCharacterPage()
         if tracked then
             row.status:SetText("TRACKING")
             SetColor(row.status, COLORS.green)
-            row.statusMarker:SetVertexColor(unpack(COLORS.green))
+            IRS:SetLayoutColor(row.statusMarker, "SetVertexColor", unpack(COLORS.green))
         else
             row.status:SetText("IGNORED")
             SetColor(row.status, COLORS.red)
-            row.statusMarker:SetVertexColor(unpack(COLORS.red))
+            IRS:SetLayoutColor(row.statusMarker, "SetVertexColor", unpack(COLORS.red))
         end
         row:Show()
     end
@@ -2261,16 +2261,16 @@ function IRS:RefreshReportsPage()
 
     for key, b in pairs(reportPeriodButtons) do
         if key == reportPeriod then
-            b:SetBackdropColor(0.18, 0.13, 0.05, 1); b:SetBackdropBorderColor(unpack(COLORS.goldSoft)); SetColor(b.label, COLORS.gold)
+            IRS:SetLayoutColor(b, "SetBackdropColor", 0.18, 0.13, 0.05, 1); IRS:SetLayoutColor(b, "SetBackdropBorderColor", unpack(COLORS.goldSoft)); SetColor(b.label, COLORS.gold)
         else
-            b:SetBackdropColor(unpack(COLORS.panelAlt)); b:SetBackdropBorderColor(unpack(COLORS.borderSoft)); SetColor(b.label, COLORS.text)
+            IRS:SetLayoutColor(b, "SetBackdropColor", unpack(COLORS.panelAlt)); IRS:SetLayoutColor(b, "SetBackdropBorderColor", unpack(COLORS.borderSoft)); SetColor(b.label, COLORS.text)
         end
     end
     for key, b in pairs(reportViewButtons) do
         if key == reportView then
-            b:SetBackdropColor(0.18, 0.13, 0.05, 1); b:SetBackdropBorderColor(unpack(COLORS.goldSoft)); SetColor(b.label, COLORS.gold)
+            IRS:SetLayoutColor(b, "SetBackdropColor", 0.18, 0.13, 0.05, 1); IRS:SetLayoutColor(b, "SetBackdropBorderColor", unpack(COLORS.goldSoft)); SetColor(b.label, COLORS.gold)
         else
-            b:SetBackdropColor(unpack(COLORS.panelAlt)); b:SetBackdropBorderColor(unpack(COLORS.borderSoft)); SetColor(b.label, COLORS.text)
+            IRS:SetLayoutColor(b, "SetBackdropColor", unpack(COLORS.panelAlt)); IRS:SetLayoutColor(b, "SetBackdropBorderColor", unpack(COLORS.borderSoft)); SetColor(b.label, COLORS.text)
         end
     end
 
@@ -3003,11 +3003,11 @@ function IRS:SelectTab(key)
 
     for tabKey, button in pairs(tabs) do
         if tabKey == key then
-            button:SetBackdropColor(0.15, 0.115, 0.070, 0.42)
+            IRS:SetLayoutColor(button, "SetBackdropColor", 0.15, 0.115, 0.070, 0.42)
             SetColor(button.label, COLORS.gold)
             button.activeBar:Show()
         else
-            button:SetBackdropColor(0, 0, 0, 0)
+            IRS:SetLayoutColor(button, "SetBackdropColor", 0, 0, 0, 0)
             SetColor(button.label, COLORS.text)
             button.activeBar:Hide()
         end

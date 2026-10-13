@@ -23,7 +23,7 @@ local COLORS = {
 local MINI_MAX_PROJECTS = 5
 
 local function SetColor(fontString, color)
-    fontString:SetTextColor(color[1], color[2], color[3], color[4] or 1)
+    IRS:SetLayoutColor(fontString, "SetTextColor", color[1], color[2], color[3], color[4] or 1)
 end
 
 local function MakeText(parent, size, color, justify, flags)
@@ -51,15 +51,15 @@ local function MakePanel(parent, bgColor)
         edgeSize = 1,
     })
     local c = bgColor or COLORS.panel
-    panel:SetBackdropColor(c[1], c[2], c[3], c[4] or 1)
-    panel:SetBackdropBorderColor(unpack(COLORS.border))
+    IRS:SetLayoutColor(panel, "SetBackdropColor", c[1], c[2], c[3], c[4] or 1)
+    IRS:SetLayoutColor(panel, "SetBackdropBorderColor", unpack(COLORS.border))
     return panel
 end
 
 local function AddDivider(parent, anchorPoint, relPoint, x, y, alpha)
     local line = parent:CreateTexture(nil, "BORDER")
     line:SetTexture("Interface/Buttons/WHITE8X8")
-    line:SetVertexColor(COLORS.border[1], COLORS.border[2], COLORS.border[3], alpha or 0.85)
+    IRS:SetLayoutColor(line, "SetVertexColor", COLORS.border[1], COLORS.border[2], COLORS.border[3], alpha or 0.85)
     line:SetHeight(1)
     line:SetPoint(anchorPoint, parent, relPoint, x or 0, y or 0)
     line:SetPoint("RIGHT", parent, "RIGHT", -(x or 0), y or 0)
@@ -173,8 +173,8 @@ miniDashboard:SetBackdrop({
     edgeFile = "Interface/Buttons/WHITE8X8",
     edgeSize = 1,
 })
-miniDashboard:SetBackdropColor(0.165, 0.125, 0.085, 0.90)
-miniDashboard:SetBackdropBorderColor(0.52, 0.39, 0.22, 1)
+IRS:SetLayoutColor(miniDashboard, "SetBackdropColor", 0.165, 0.125, 0.085, 0.90)
+IRS:SetLayoutColor(miniDashboard, "SetBackdropBorderColor", 0.52, 0.39, 0.22, 1)
 miniDashboard:Hide()
 IRS.miniDashboardFrame = miniDashboard
 
@@ -326,7 +326,7 @@ miniHeader:SetPoint("TOPLEFT", 7, -7)
 miniHeader:SetPoint("TOPRIGHT", -7, -7)
 miniHeader:SetHeight(34)
 miniHeader:SetBackdrop({ bgFile = "Interface/Buttons/WHITE8X8" })
-miniHeader:SetBackdropColor(0.190, 0.145, 0.098, 0.86)
+IRS:SetLayoutColor(miniHeader, "SetBackdropColor", 0.190, 0.145, 0.098, 0.86)
 
 local miniHeaderTitle = MakeText(miniHeader, 13, COLORS.gold, "LEFT")
 miniHeaderTitle:SetPoint("LEFT", 8, 2)
@@ -426,12 +426,12 @@ local function UpdateMiniTokenAlert(summary)
     SetColor(miniTokenAlert.title, color)
 
     if isBuy then
-        miniTokenAlert:SetBackdropColor(0.10, 0.16, 0.09, 0.88)
+        IRS:SetLayoutColor(miniTokenAlert, "SetBackdropColor", 0.10, 0.16, 0.09, 0.88)
     else
-        miniTokenAlert:SetBackdropColor(0.20, 0.15, 0.06, 0.88)
+        IRS:SetLayoutColor(miniTokenAlert, "SetBackdropColor", 0.20, 0.15, 0.06, 0.88)
     end
 
-    miniTokenAlert:SetBackdropBorderColor(
+    IRS:SetLayoutColor(miniTokenAlert, "SetBackdropBorderColor",
         color[1],
         color[2],
         color[3],
@@ -449,7 +449,7 @@ local miniPeriods = MakePanel(miniDashboard, COLORS.softFill)
 miniPeriods:SetPoint("TOPLEFT", 9, -47)
 miniPeriods:SetPoint("TOPRIGHT", -9, -47)
 miniPeriods:SetHeight(127)
-miniPeriods:SetBackdropBorderColor(0, 0, 0, 0)
+IRS:SetLayoutColor(miniPeriods, "SetBackdropBorderColor", 0, 0, 0, 0)
 miniPeriods.topLine = AddDivider(miniPeriods, "TOPLEFT", "TOPLEFT", 0, 0, 0.9)
 miniPeriods.bottomLine = AddDivider(miniPeriods, "BOTTOMLEFT", "BOTTOMLEFT", 0, 0, 0.9)
 
@@ -484,7 +484,7 @@ for i, info in ipairs(miniPeriodLabels) do
     if i < #miniPeriodLabels then
         row.divider = row:CreateTexture(nil, "BORDER")
         row.divider:SetTexture("Interface/Buttons/WHITE8X8")
-        row.divider:SetVertexColor(COLORS.border[1], COLORS.border[2], COLORS.border[3], 0.45)
+        IRS:SetLayoutColor(row.divider, "SetVertexColor", COLORS.border[1], COLORS.border[2], COLORS.border[3], 0.45)
         row.divider:SetHeight(1)
         row.divider:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, -2)
         row.divider:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, -2)
@@ -567,10 +567,10 @@ local function EnsureMiniProjectRow(index)
 
     local row = MakePanel(miniProjectsBody, COLORS.softFill)
     row:SetHeight(50)
-    row:SetBackdropBorderColor(0, 0, 0, 0)
+    IRS:SetLayoutColor(row, "SetBackdropBorderColor", 0, 0, 0, 0)
     row.divider = row:CreateTexture(nil, "BORDER")
     row.divider:SetTexture("Interface/Buttons/WHITE8X8")
-    row.divider:SetVertexColor(COLORS.border[1], COLORS.border[2], COLORS.border[3], 0.65)
+    IRS:SetLayoutColor(row.divider, "SetVertexColor", COLORS.border[1], COLORS.border[2], COLORS.border[3], 0.65)
     row.divider:SetHeight(1)
     row.divider:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 0)
     row.divider:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
@@ -625,7 +625,7 @@ miniProjectsMore:Hide()
 -- five-row compact display limit.
 local miniProjectsSummary = MakePanel(miniDashboard, COLORS.softFill)
 miniProjectsSummary:SetHeight(62)
-miniProjectsSummary:SetBackdropBorderColor(0, 0, 0, 0)
+IRS:SetLayoutColor(miniProjectsSummary, "SetBackdropBorderColor", 0, 0, 0, 0)
 miniProjectsSummary.topLine = AddDivider(miniProjectsSummary, "TOPLEFT", "TOPLEFT", 0, 0, 0.9)
 miniProjectsSummary:Hide()
 
@@ -711,10 +711,10 @@ local MINI_MAX_RESERVES = 3
 local function EnsureMiniReserveRow(index)
     if miniReservesBody.rows[index] then return miniReservesBody.rows[index] end
     local row = MakePanel(miniReservesBody, COLORS.softFill)
-    row:SetHeight(48); row:SetBackdropBorderColor(0,0,0,0)
+    row:SetHeight(48); IRS:SetLayoutColor(row, "SetBackdropBorderColor", 0,0,0,0)
     row.divider = row:CreateTexture(nil, "BORDER")
     row.divider:SetTexture("Interface/Buttons/WHITE8X8")
-    row.divider:SetVertexColor(COLORS.border[1], COLORS.border[2], COLORS.border[3], 0.65)
+    IRS:SetLayoutColor(row.divider, "SetVertexColor", COLORS.border[1], COLORS.border[2], COLORS.border[3], 0.65)
     row.divider:SetHeight(1); row.divider:SetPoint("BOTTOMLEFT", 0, 0); row.divider:SetPoint("BOTTOMRIGHT", 0, 0)
     row.name = MakeText(row, "heading3", COLORS.goldSoft, "LEFT")
     row.name:SetPoint("TOPLEFT", 8, -7); row.name:SetPoint("TOPRIGHT", -8, -7)

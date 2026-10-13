@@ -51,7 +51,7 @@ local function MakeText(parent, style, color, justify)
     fs:SetJustifyH(justify or "LEFT")
     fs:SetJustifyV("MIDDLE")
     if color then
-        fs:SetTextColor(color[1], color[2], color[3], color[4] or 1)
+        IRS:SetLayoutColor(fs, "SetTextColor", color[1], color[2], color[3], color[4] or 1)
     end
     IRS:RegisterFontString("main", style, fs, STANDARD_TEXT_FONT, "")
     return fs
@@ -65,8 +65,8 @@ local function MakePanel(parent, color)
         edgeSize = 2,
     })
     local c = color or COLORS.panelAlt
-    panel:SetBackdropColor(c[1], c[2], c[3], c[4] or 1)
-    panel:SetBackdropBorderColor(unpack(COLORS.border))
+    IRS:SetLayoutColor(panel, "SetBackdropColor", c[1], c[2], c[3], c[4] or 1)
+    IRS:SetLayoutColor(panel, "SetBackdropBorderColor", unpack(COLORS.border))
     return panel
 end
 

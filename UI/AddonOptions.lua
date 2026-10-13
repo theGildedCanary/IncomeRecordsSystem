@@ -19,7 +19,7 @@ local version = C_AddOns.GetAddOnMetadata(
 local versionText = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 IRS:RegisterFontString("main", "helper", versionText, STANDARD_TEXT_FONT, "")
 versionText:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
-versionText:SetTextColor(0.65, 0.65, 0.65)
+IRS:SetLayoutColor(versionText, "SetTextColor", 0.65, 0.65, 0.65)
 versionText:SetText("Version: " .. version)
 
 -- Description Display

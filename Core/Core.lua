@@ -4194,6 +4194,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
         IRS:EnsureDB()
         IRS:ApplySavedFontSizes()
+        IRS:ApplySavedLayoutStyle()
 
         local minimapTiming = IRS:BeginStartupTiming("Minimap button refresh")
         if IRS.RefreshMinimapButton then IRS:RefreshMinimapButton() end
@@ -4204,6 +4205,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
     if event == "PLAYER_LOGIN" then
         -- Include any interfaces constructed during ADDON_LOADED callbacks.
         IRS:ApplySavedFontSizes()
+        IRS:ApplySavedLayoutStyle()
         IRS:ScheduleStartupTimingFinish(4.0)
         loginScanPending = true
 

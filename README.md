@@ -25,6 +25,7 @@ The attached release ZIP is the packaged addon intended for installation. GitHub
 - Tracks locally observed **WoW Token prices** and configurable market alerts.
 - Includes a **Profit Distribution Calculator** for splitting positive tracked profit across active Savings Projects and Reserve Funds.
 - Provides reports, font controls, window resizing, and per-character tracking.
+- Choose **IRS Default** or **ElvUI Inspired** under **Settings > Fonts > Layout style**. The ElvUI-inspired style uses translucent dark panels, subtle borders, and neutral text with gold accents. It applies immediately across IRS and saves account-wide; ElvUI is not required.
 - IRS never moves gold automatically.
 
 ## Installation

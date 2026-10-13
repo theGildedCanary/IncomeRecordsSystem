@@ -2,13 +2,14 @@
 ## Title: IRS — Income Records System
 ## Notes: IRS-themed account-wide gold earnings ledger for World of Warcraft Retail.
 ## Author: Gilded Canary
-## Version: 1.3.0
+## Version: 1.3.1
 ## IconTexture: Interface\AddOns\IncomeRecordsSystem\Media\IRSButton
 ## SavedVariables: IncomeRecordsSystemDB
 
 # Core framework and data model
 Core\Core.lua
 Core\Formatting.lua
+UI\LayoutStyle.lua
 
 # Feature modules that must exist before the main UI is built
 Features\Transfers.lua

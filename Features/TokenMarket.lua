@@ -25,7 +25,7 @@ local function Now()
 end
 
 local function SetColor(fs, color)
-    fs:SetTextColor(color[1], color[2], color[3], color[4] or 1)
+    IRS:SetLayoutColor(fs, "SetTextColor", color[1], color[2], color[3], color[4] or 1)
 end
 
 local function MakeText(parent, style, color, justify, flags)
@@ -51,8 +51,8 @@ local function MakePanel(parent, color)
         edgeSize = 2,
     })
     local c = color or COLORS.panelAlt
-    frame:SetBackdropColor(c[1], c[2], c[3], c[4] or 1)
-    frame:SetBackdropBorderColor(unpack(COLORS.border))
+    IRS:SetLayoutColor(frame, "SetBackdropColor", c[1], c[2], c[3], c[4] or 1)
+    IRS:SetLayoutColor(frame, "SetBackdropBorderColor", unpack(COLORS.border))
     return frame
 end
 
@@ -348,7 +348,7 @@ local function ShowTokenSplash(summary)
         )
     )
 
-    tokenSplash:SetBackdropBorderColor(
+    IRS:SetLayoutColor(tokenSplash, "SetBackdropBorderColor",
         color[1],
         color[2],
         color[3],
@@ -1084,7 +1084,7 @@ function IRS:AttachTokenDashboardCard(dashboard, leftPanel, rightPanel)
 
     panel.divider = panel:CreateTexture(nil, "BORDER")
     panel.divider:SetTexture("Interface/Buttons/WHITE8X8")
-    panel.divider:SetVertexColor(unpack(COLORS.border))
+    IRS:SetLayoutColor(panel.divider, "SetVertexColor", unpack(COLORS.border))
     panel.divider:SetHeight(1)
     panel.divider:SetPoint("TOPLEFT", 0, 0)
     panel.divider:SetPoint("TOPRIGHT", 0, 0)
