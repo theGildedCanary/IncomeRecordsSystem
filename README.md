@@ -4,6 +4,8 @@
 
 IRS tracks observed gold income and spending while you play, maintains account-wide and per-character history, and provides tools for planning Savings Projects and Reserve Funds.
 
+**Current version: 1.3.3**
+
 ## Download
 
 For normal installation, download the latest `IncomeRecordsSystem-vX.Y.Z.zip` file from the [GitHub Releases](https://github.com/theGildedCanary/IncomeRecordsSystem/releases/latest) page.
@@ -14,7 +16,8 @@ The attached release ZIP is the packaged addon intended for installation. GitHub
 
 - Tracks observed net gold movement: income adds to the ledger and spending subtracts from it.
 - Maintains account-wide and per-character day, week, month, and total history.
-- Displays Blizzard lifetime Wealth statistics separately from IRS-observed history.
+- Filters **Account Overview** income, auction activity, and spending by a saved tracking start date; displays Blizzard lifetime Wealth statistics separately in Reports.
+- Offers optional active-character session profit per hour in the main and Mini Dashboards.
 - Supports **Savings Projects** with targets, deadlines, funding sources, daily allocation splits, checkpoints, daily progress, and trajectory graphs. Changing a split affects future attributed source changes without reallocating gold already attributed to a project.
 - Supports **Reserve Funds** for balances you want to maintain rather than spend down.
 - Filters transfers between owned storage locations so moving your own gold does not count as profit or loss.
@@ -65,6 +68,48 @@ IRS stores money internally in copper.
 Its net ledger is **forward-looking**. IRS can only record wallet changes that it observes while the addon is active. Historical gold activity from before IRS began tracking cannot be reconstructed.
 
 Blizzard lifetime Wealth statistics are displayed as a separate dataset and are not backfilled into the IRS ledger.
+
+## Account Overview
+
+Enter a tracking start date beside the Account Overview heading as `YYYY-MM-DD`
+and press Enter. The date is saved account-wide and includes that day's recorded
+activity. Income, auction activity, and spending use available IRS records since
+the selected date; Reports keeps Blizzard lifetime Wealth statistics separate.
+
+Total Gold Acquired is gross external wallet income after recognized internal
+transfer corrections. Guild Bank and Warband Bank sit beneath it, above a pale
+divider and the individual income sources. Bank amounts show the latest known
+balances, rather than activity since the date; access a tracked Guild Bank to
+refresh its balance.
+
+Every positive external wallet gain starts in **Other Income**. Recent matching
+loot, quest, vendor, or auction statistics move only received amounts into those
+categories. Unmatched gains, including trades and NPC patron/player crafting-order
+commissions, stay in Other Income. Order gold counts when received in the wallet;
+item and material rewards do not count as gold. Spending does not reduce gross
+Other Income, and recognized internal-transfer corrections remove matching income.
+Old source-statistic totals cannot hide new unmatched payouts.
+
+Spending / Coverage lists Flight Paths, Postage, Transmog, Repairs, Auction
+Expenses, and Vendor Purchases, followed by a divider and Tracking Coverage.
+Repairs, Auction Expenses, and Vendor Purchases begin recording with version
+1.3.3. IRS classifies confirmed wallet losses at merchants as repairs (repair
+mode or repair-all) or vendor purchases, and at the auction house as auction
+expenses (purchases and posting deposits). Guild-paid repairs are excluded.
+
+Missing historical activity cannot be reconstructed. Largest Sale/Bid entries
+marked with an asterisk only detect new Blizzard lifetime records observed during
+the selected period and show `0g` when none was recorded. Earlier missing Other
+Income may not be recoverable from legacy records.
+
+## Character Profit Per Hour
+
+Enable **Show character gold profit per hour** under **Settings > Toggles >
+General Toggles**. The active character's session net earnings divided by hours
+online appears as a centered gold amount beneath the four dashboard period totals
+and beneath the character's Net Today in the Mini Dashboard. It includes spending,
+excludes recognized internal transfers, updates every second while visible, and
+resets on login or UI reload.
 
 ## Savings Projects and Reserve Funds
 

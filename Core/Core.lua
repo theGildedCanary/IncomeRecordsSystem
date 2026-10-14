@@ -1208,6 +1208,41 @@ end
 -- amount may be positive (income) or negative (spending/loss).
 -- sourceDeltas contains any Blizzard income categories that changed.
 -- Writes the change to account totals AND the selected character's history.
+-- Other income is a wallet counter, not a subtraction of unrelated lifetime
+-- statistic totals. Initialize legacy buckets once from their retained data.
+function IRS:EnsureOtherIncome(bucket)
+    if bucket.otherIncome ~= nil then return end
+    local classified = 0
+    for _, name in ipairs(TRACKED_SOURCE_STATS) do
+        classified = classified + ((bucket.sources or {})[name] or 0)
+    end
+    bucket.otherIncome = math.max(0, (bucket.income or 0) - classified)
+end
+
+-- Statistics can arrive after PLAYER_MONEY. Match only recent positive wallet
+-- entries for this character; a later statistic cannot erase old Other income.
+IRS.pendingIncomeSources = {}
+function IRS:MatchIncomeSource(amount, characterKey)
+    local remaining = amount
+    local now = ServerNow()
+    local kept = {}
+    for _, entry in ipairs(self.pendingIncomeSources) do
+        if entry.remaining > 0 and now - entry.at <= 5 then
+            if entry.characterKey == characterKey and remaining > 0 then
+                local matched = math.min(remaining, entry.remaining)
+                entry.remaining = entry.remaining - matched
+                remaining = remaining - matched
+                for _, bucket in ipairs(entry.buckets) do
+                    bucket.otherIncome = math.max(0, (bucket.otherIncome or 0) - matched)
+                end
+            end
+            if entry.remaining > 0 then kept[#kept + 1] = entry end
+        end
+    end
+    self.pendingIncomeSources = kept
+    return amount - remaining
+end
+
 function IRS:RecordEarnings(amount, sourceDeltas, characterKey, reversesTransfer)
     if not IRS.db then IRS:EnsureDB() end
     -- "Earnings" is a net ledger: positive wallet changes are income and
@@ -1233,7 +1268,37 @@ function IRS:RecordEarnings(amount, sourceDeltas, characterKey, reversesTransfer
     IRS:EnsurePeriodFlows(dayBucket, "days", dayKey)
     IRS:EnsurePeriodFlows(weekBucket, "weeks", weekKey)
     IRS:EnsurePeriodFlows(monthBucket, "months", monthKey)
+    local incomeBuckets = {dayBucket, weekBucket, monthBucket}
+    for _, bucket in ipairs(incomeBuckets) do self:EnsureOtherIncome(bucket) end
+    if amount > 0 and not reversesTransfer then
+        for _, bucket in ipairs(incomeBuckets) do
+            bucket.otherIncome = bucket.otherIncome + amount
+        end
+        -- Prune expired entries before adding the new wallet gain.
+        self:MatchIncomeSource(0, characterKey)
+        self.pendingIncomeSources[#self.pendingIncomeSources + 1] = {
+            characterKey = characterKey, at = ServerNow(), remaining = amount,
+            buckets = incomeBuckets,
+        }
+    elseif amount < 0 and reversesTransfer then
+        for _, bucket in ipairs(incomeBuckets) do
+            bucket.otherIncome = math.max(0, bucket.otherIncome + amount)
+        end
+        local remaining = -amount
+        for i = #self.pendingIncomeSources, 1, -1 do
+            local entry = self.pendingIncomeSources[i]
+            if entry.characterKey == characterKey then
+                local matched = math.min(remaining, entry.remaining)
+                entry.remaining = entry.remaining - matched
+                remaining = remaining - matched
+                if remaining == 0 then break end
+            end
+        end
+    end
 
+    if amount ~= 0 and characterKey == self:CharacterKey() then
+        self.characterRateNet = (self.characterRateNet or 0) + amount
+    end
     if amount ~= 0 then
         -- Keep gross flows separately: a late internal-transfer match removes
         -- the original flow instead of manufacturing income or spending.
@@ -1283,6 +1348,9 @@ function IRS:RecordEarnings(amount, sourceDeltas, characterKey, reversesTransfer
 
     for _, statName in ipairs(TRACKED_SOURCE_STATS) do
         local delta = math.max(0, math.floor(tonumber(sourceDeltas[statName]) or 0))
+        if delta > 0 then
+            delta = self:MatchIncomeSource(delta, characterKey)
+        end
         if delta > 0 then
             tracking.sources[statName] = (tracking.sources[statName] or 0) + delta
             dayBucket.sources[statName] = (dayBucket.sources[statName] or 0) + delta
@@ -1346,6 +1414,7 @@ function IRS:UpdateEarningsLedger(record, currentStats)
     -- do not always update at the same moment as the player's wallet. Gross
     -- earnings are therefore recorded from PLAYER_MONEY / GetMoney deltas;
     -- these deltas only classify the already-recorded earnings by source.
+    self:RecordOverviewStatistics(currentStats, tracker.lastStats)
     local sourceDeltas = {}
     for _, statName in ipairs(TRACKED_SOURCE_STATS) do
         local current = currentStats[statName]
@@ -1449,6 +1518,8 @@ function IRS:RecordTransmogSpend(amount, characterKey)
     if record and record.trackingEnabled == false then return end
 
     IRS.db.spending = IRS.db.spending or {}
+    local day = self:GetOverviewDay()
+    day.transmogSpent = (day.transmogSpent or 0) + amount
     IRS.db.spending.transmog = (tonumber(IRS.db.spending.transmog) or 0) + amount
 
     if record then
@@ -1583,6 +1654,7 @@ function IRS:HandleMoneyChange()
         end
 
         if netChange ~= 0 and not deferred then
+            if netChange < 0 then IRS:RecordOverviewWalletExpense(-netChange) end
             IRS:RecordEarnings(netChange, {}, key)
             IRS:RecordTransactionLedgerEffect(
                 transactionId,
@@ -1777,6 +1849,100 @@ function IRS:GetTotals()
     -- Unlike Travel/Postage, this is IRS-observed spending rather than a Blizzard
     -- lifetime statistic. It begins with the version that introduced tracking.
     totals.transmogSpent = (IRS.db.spending and tonumber(IRS.db.spending.transmog)) or 0
+    return totals
+end
+
+
+IRS.characterRateStarted = GetTime and GetTime() or ServerNow()
+function IRS:GetCharacterProfitPerHour()
+    local elapsed = (GetTime and GetTime() or ServerNow()) - self.characterRateStarted
+    return elapsed >= 1 and (self.characterRateNet or 0) * 3600 / elapsed or 0
+end
+function IRS:GetOverviewDay()
+    local overview = self.db.account.overview
+    if not overview then
+        overview = {startDate = select(1, self:GetPeriodKeys()), days = {}}
+        self.db.account.overview = overview
+    end
+    local key = select(1, self:GetPeriodKeys())
+    overview.days[key] = overview.days[key] or {}
+    return overview.days[key]
+end
+function IRS:SetOverviewStartDate(key)
+    local y, m, d = tostring(key):match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+    if not y then return false end
+    local stamp = time({year=tonumber(y), month=tonumber(m), day=tonumber(d), hour=12})
+    if not stamp or date("%Y-%m-%d", stamp) ~= key or key > select(1, self:GetPeriodKeys()) then return false end
+    self:GetOverviewDay()
+    self.db.account.overview.startDate = key
+    if self.RefreshUI then self:RefreshUI() end
+    return true
+end
+function IRS:RecordOverviewStatistics(current, previous)
+    local day = self:GetOverviewDay()
+    for _, name in ipairs({"auctionsPosted", "auctionPurchases", "travelSpent", "postageSpent", "largestSale", "largestBid"}) do
+        local value, baseline = current[name], previous[name]
+        if type(value) == "number" and type(baseline) == "number" and value > baseline then
+            if name == "largestSale" or name == "largestBid" then day[name] = math.max(day[name] or 0, value)
+            else day[name] = (day[name] or 0) + value - baseline end
+        end
+    end
+end
+-- Classify confirmed wallet spending while the matching service is open.
+IRS.expenseRuntime = {merchantOpen = false, auctionOpen = false}
+if hooksecurefunc and RepairAllItems then
+    hooksecurefunc("RepairAllItems", function(useGuildBank)
+        if not useGuildBank then
+            IRS.expenseRuntime.repairUntil = (GetTime and GetTime() or ServerNow()) + 2
+        end
+    end)
+end
+if hooksecurefunc then
+    for _, api in ipairs({"BuyMerchantItem", "BuybackItem"}) do
+        if _G[api] then
+            hooksecurefunc(api, function() IRS.expenseRuntime.repairUntil = nil end)
+        end
+    end
+end
+function IRS:RecordOverviewWalletExpense(amount)
+    if amount <= 0 then return end
+    local state = self.expenseRuntime
+    local now = GetTime and GetTime() or ServerNow()
+    local category
+    if state.merchantOpen then
+        if (InRepairMode and InRepairMode()) or (state.repairUntil and now <= state.repairUntil) then
+            category = "repairsSpent"
+            state.repairUntil = nil
+        else category = "vendorSpent" end
+    elseif state.auctionOpen then category = "auctionSpent" end
+    if category then
+        local day = self:GetOverviewDay()
+        day[category] = (day[category] or 0) + amount
+    end
+end
+
+function IRS:GetOverviewTotals()
+    self:GetOverviewDay()
+    local overview = self.db.account.overview
+    local totals = self:GetTotals()
+    for _, name in ipairs({"totalAcquired", "goldLooted", "questGold", "vendorGold", "auctionGold", "auctionsPosted", "auctionPurchases", "largestSale", "largestBid", "travelSpent", "postageSpent", "transmogSpent", "repairsSpent", "auctionSpent", "vendorSpent", "otherIncome"}) do totals[name] = 0 end
+    for key, bucket in pairs(self.db.tracking.days) do
+        if key >= overview.startDate then
+            self:EnsurePeriodFlows(bucket, "days", key)
+            self:EnsureOtherIncome(bucket)
+            totals.otherIncome = totals.otherIncome + math.min(bucket.income or 0, bucket.otherIncome)
+            totals.totalAcquired = totals.totalAcquired + (tonumber(bucket.income) or 0)
+            for _, name in ipairs({"goldLooted", "questGold", "vendorGold", "auctionGold"}) do totals[name] = totals[name] + ((bucket.sources or {})[name] or 0) end
+        end
+    end
+    for key, day in pairs(overview.days) do
+        if key >= overview.startDate then
+            for name, value in pairs(day) do
+                if name == "largestSale" or name == "largestBid" then totals[name] = math.max(totals[name], value)
+                else totals[name] = (totals[name] or 0) + value end
+            end
+        end
+    end
     return totals
 end
 
@@ -4050,6 +4216,8 @@ function IRS:SetSetting(key, value)
     IRS.db.settings[key] = value and true or false
     if key == "showMinimapButton" and IRS.RefreshMinimapButton then
         IRS:RefreshMinimapButton()
+    elseif key == "showCharacterProfitPerHour" then
+        if IRS.RefreshUI then IRS:RefreshUI() end
     elseif key == "showMiniProjects" and IRS.RefreshMiniDashboard then
         IRS:RefreshMiniDashboard()
         if IRS.RefreshSettingsPage then IRS:RefreshSettingsPage() end
@@ -4129,6 +4297,10 @@ local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_MONEY")
+eventFrame:RegisterEvent("MERCHANT_SHOW")
+eventFrame:RegisterEvent("MERCHANT_CLOSED")
+eventFrame:RegisterEvent("AUCTION_HOUSE_SHOW")
+eventFrame:RegisterEvent("AUCTION_HOUSE_CLOSED")
 eventFrame:RegisterEvent("PLAYER_LEVEL_UP")
 eventFrame:RegisterEvent("CRITERIA_UPDATE")
 eventFrame:RegisterEvent("QUEST_TURNED_IN")
@@ -4191,6 +4363,21 @@ local function QueueMoneyScans()
 end
 
 eventFrame:SetScript("OnEvent", function(_, event, arg1)
+    if event == "MERCHANT_SHOW" then
+        IRS.expenseRuntime.merchantOpen = true
+        IRS.expenseRuntime.repairUntil = nil
+        return
+    elseif event == "MERCHANT_CLOSED" then
+        IRS.expenseRuntime.merchantOpen = false
+        IRS.expenseRuntime.repairUntil = nil
+        return
+    elseif event == "AUCTION_HOUSE_SHOW" then
+        IRS.expenseRuntime.auctionOpen = true
+        return
+    elseif event == "AUCTION_HOUSE_CLOSED" then
+        IRS.expenseRuntime.auctionOpen = false
+        return
+    end
     if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
         IRS:EnsureDB()
         IRS:ApplySavedFontSizes()

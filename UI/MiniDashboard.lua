@@ -456,6 +456,7 @@ miniPeriods.bottomLine = AddDivider(miniPeriods, "BOTTOMLEFT", "BOTTOMLEFT", 0, 
 local miniPeriodRows = {}
 local miniPeriodLabels = {
     {"Character Today", "today", "character", "character"},
+    {"Profit per hour", "hour", "hour", "character"},
     {"Today", "today", "account", "today"},
     {"This Week", "week", "account", "week"},
     {"This Month", "month", "account", "month"},
@@ -726,6 +727,18 @@ local function EnsureMiniReserveRow(index)
     return row
 end
 
+local rateElapsed = 0
+miniPeriods:HookScript("OnUpdate", function(_, elapsed)
+    rateElapsed = rateElapsed + elapsed
+    if rateElapsed < 1 then return end
+    rateElapsed = 0
+    if IRS.db and IRS.db.settings.showCharacterProfitPerHour then
+        for _, row in ipairs(miniPeriodRows) do
+            if row.scope == "hour" then row.value:SetText(FormatGold(IRS:GetCharacterProfitPerHour(), true) .. " / hr") end
+        end
+    end
+end)
+
 -- ============================================================================
 -- REFRESH
 -- ============================================================================
@@ -743,16 +756,18 @@ function IRS:RefreshMiniDashboard()
 
     for _, row in ipairs(miniPeriodRows) do
         row.shouldShow = IRS:IsMiniStatShown(row.visibilityKey)
+        if row.scope == "hour" then row.shouldShow = IRS.db.settings.showCharacterProfitPerHour == true end
         row:SetShown(row.shouldShow)
         if row.scope == "character" then
             row.label:SetText(characterName .. "'s Net Today")
         end
 
         local source = row.scope == "character" and characterEarnings or earnings
-        local amount = source[row.key] or 0
+        local amount = row.scope == "hour" and IRS:GetCharacterProfitPerHour() or source[row.key] or 0
 
         row.value:SetText(FormatGold(amount, true))
-        SetNetColor(row.value, amount, COLORS.goldSoft)
+        if row.scope == "hour" then row.value:SetText(FormatGold(amount, true) .. " / hr"); row.value:SetTextColor(unpack(COLORS.gold))
+        else SetNetColor(row.value, amount, COLORS.goldSoft) end
     end
 
     local showProjects = IRS.db.settings.showMiniProjects ~= false

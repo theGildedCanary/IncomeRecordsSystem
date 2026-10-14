@@ -334,6 +334,20 @@ periodContainer:SetPoint("TOPLEFT", 0, -104)
 periodContainer:SetPoint("TOPRIGHT", 0, -104)
 periodContainer:SetHeight(84)
 
+local characterRate = MakeText(dashboard, 14, COLORS.gold, "CENTER")
+characterRate:SetPoint("TOPLEFT", periodContainer, "BOTTOMLEFT", 0, -3)
+characterRate:SetPoint("TOPRIGHT", periodContainer, "BOTTOMRIGHT", 0, -3)
+
+local rateElapsed = 0
+dashboard:HookScript("OnUpdate", function(_, elapsed)
+    rateElapsed = rateElapsed + elapsed
+    if rateElapsed < 1 then return end
+    rateElapsed = 0
+    if IRS.db and IRS.db.settings.showCharacterProfitPerHour then
+        characterRate:SetText(FormatGold(IRS:GetCharacterProfitPerHour(), true) .. " / hour (" .. (UnitName("player") or "Character") .. ")")
+    end
+end)
+
 -- Builds one headline card: Today, This Week, This Month, or Total Recorded.
 -- The large value is account-wide; the small person-marked value is current toon.
 local function MakePeriodCard(parent, x, width, heading)
@@ -438,6 +452,32 @@ local overviewTitle = MakeText(dashboard, 15, COLORS.text, "LEFT")
 overviewTitle:SetPoint("TOPLEFT", 0, -445)
 overviewTitle:SetText("ACCOUNT OVERVIEW")
 
+
+local overviewDate = CreateFrame("EditBox", nil, dashboard, "InputBoxTemplate")
+overviewDate:SetSize(100, 22)
+overviewDate:SetPoint("LEFT", overviewTitle, "RIGHT", 20, 0)
+overviewDate:SetAutoFocus(false)
+overviewDate:SetMaxLetters(10)
+overviewDate:SetScript("OnEnterPressed", function(self)
+    if not IRS:SetOverviewStartDate(self:GetText()) then
+        print("IRS: Enter a valid start date as YYYY-MM-DD, no later than today.")
+        self:SetText(IRS.db.account.overview.startDate)
+    end
+    self:ClearFocus()
+end)
+overviewDate:SetScript("OnEscapePressed", function(self)
+    self:SetText(IRS.db.account.overview.startDate)
+    self:ClearFocus()
+end)
+overviewDate:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:AddLine("Tracking start date (YYYY-MM-DD)")
+    GameTooltip:AddLine("Press Enter to apply. Uses available IRS records since this date.", 1, 1, 1, true)
+    GameTooltip:AddLine("Auction counts and spending are observed from this update onward. Largest sale/bid detects new lifetime records only.", 1, 1, 1, true)
+    GameTooltip:Show()
+end)
+overviewDate:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
 local overviewLine = dashboard:CreateTexture(nil, "BORDER")
 overviewLine:SetTexture("Interface/Buttons/WHITE8X8")
 IRS:SetLayoutColor(overviewLine, "SetVertexColor", unpack(COLORS.border))
@@ -456,7 +496,7 @@ right:SetPoint("TOPLEFT", 576, -470)
 right:SetSize(278, 181)
 
 -- Reusable builder for the three Account Overview panels on the dashboard.
-local function BuildList(panel, heading, rows)
+local function BuildList(panel, heading, rows, dividerAfter)
     panel.heading = MakeText(panel, 11, COLORS.goldSoft, "LEFT")
     panel.heading:SetPoint("TOPLEFT", 2, -4)
     panel.heading:SetText(heading)
@@ -470,6 +510,13 @@ local function BuildList(panel, heading, rows)
 
     panel.rows = {}
     panel.labels = {}
+    panel.dividerAfter = dividerAfter
+    if dividerAfter then
+        panel.groupDivider = panel:CreateTexture(nil, "BORDER")
+        panel.groupDivider:SetTexture("Interface/Buttons/WHITE8X8")
+        IRS:SetLayoutColor(panel.groupDivider, "SetVertexColor", 0.85, 0.82, 0.74, 0.25)
+        panel.groupDivider:SetHeight(1)
+    end
 
     for i, labelText in ipairs(rows) do
         local y = -39 - ((i - 1) * 22)
@@ -487,27 +534,44 @@ end
 
 BuildList(left, "INCOME SOURCES", {
     "Total gold acquired",
+    "Guild Bank",
+    "Warband Bank",
     "Gold looted",
     "Quest rewards",
     "Vendor sales",
     "Auction earnings",
     "Other income",
-})
+}, 3)
+
+local otherIncomeHelp = CreateFrame("Frame", nil, left)
+otherIncomeHelp:SetPoint("TOPLEFT", left.labels[8], "TOPLEFT", -2, 2)
+otherIncomeHelp:SetPoint("BOTTOMRIGHT", left.rows[8], "BOTTOMRIGHT", 2, -3)
+otherIncomeHelp:EnableMouse(true)
+otherIncomeHelp:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:AddLine("Other income")
+    GameTooltip:AddLine("Includes gold received from NPC patron orders, player crafting orders, trades, and other unclassified external income.", 1, 1, 1, true)
+    GameTooltip:AddLine("Order commissions count when the gold reaches your wallet, within the selected tracking dates.", 1, 1, 1, true)
+    GameTooltip:Show()
+end)
+otherIncomeHelp:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 BuildList(middle, "AUCTION ACTIVITY", {
     "Auctions posted",
     "Auction purchases",
-    "Largest sale",
-    "Largest bid",
+    "Largest sale*",
+    "Largest bid*",
 })
 
 BuildList(right, "SPENDING / COVERAGE", {
-    "Travel",
+    "Flight Paths",
     "Postage",
     "Transmog",
+    "Repairs",
+    "Auction expenses",
+    "Vendor purchases",
     "Tracking coverage",
-    "Warband Bank",
-})
+}, 6)
 
 if IRS.AttachTokenDashboardCard then
     IRS:AttachTokenDashboardCard(dashboard, left, right)
@@ -2674,7 +2738,7 @@ function IRS:RefreshMainFontLayout()
     end
 
     chartTitle:ClearAllPoints()
-    chartTitle:SetPoint("TOPLEFT", periodContainer, "BOTTOMLEFT", 0, -12)
+    chartTitle:SetPoint("TOPLEFT", periodContainer, "BOTTOMLEFT", 0, IRS.db.settings.showCharacterProfitPerHour and -34 or -12)
 
     titleUnderline:ClearAllPoints()
     titleUnderline:SetPoint("TOPLEFT", chartTitle, "BOTTOMLEFT", 0, -6)
@@ -2711,11 +2775,17 @@ function IRS:RefreshMainFontLayout()
 
     for _, panel in ipairs(overviewPanels) do
         local rowCount = #panel.rows
-        local panelHeight = math.max(160, 39 + (rowCount * overviewRowHeight) + 8)
+        local panelHeight = math.max(160, 39 + (math.max(#left.rows, #middle.rows, #right.rows) * overviewRowHeight) + 12 + 8)
         panel:SetHeight(panelHeight)
+        if panel.groupDivider then
+            local dividerY = -39 - (panel.dividerAfter * overviewRowHeight) + 3
+            panel.groupDivider:ClearAllPoints()
+            panel.groupDivider:SetPoint("TOPLEFT", 2, dividerY)
+            panel.groupDivider:SetPoint("TOPRIGHT", -2, dividerY)
+        end
 
         for i, value in ipairs(panel.rows) do
-            local y = -39 - ((i - 1) * overviewRowHeight)
+            local y = -39 - ((i - 1) * overviewRowHeight) - (panel.dividerAfter and i > panel.dividerAfter and 12 or 0)
             local label = panel.labels and panel.labels[i]
 
             if label then
@@ -2964,13 +3034,19 @@ function IRS:RefreshUI()
     SetColor(monthCard.characterValue, COLORS.muted)
     SetColor(totalCard.characterValue, COLORS.muted)
 
-    local otherIncome = math.max(0, (totals.totalAcquired or 0) - ((totals.goldLooted or 0) + (totals.questGold or 0) + (totals.vendorGold or 0) + (totals.auctionGold or 0)))
+    totals = IRS:GetOverviewTotals()
+    if not overviewDate:HasFocus() then overviewDate:SetText(IRS.db.account.overview.startDate) end
+    characterRate:SetShown(IRS.db.settings.showCharacterProfitPerHour == true)
+    characterRate:SetText(FormatGold(IRS:GetCharacterProfitPerHour(), true) .. " / hour (" .. shortName .. ")")
+    local otherIncome = totals.otherIncome or 0
     left.rows[1]:SetText(FormatGold(totals.totalAcquired or 0, true))
-    left.rows[2]:SetText(FormatGold(totals.goldLooted or 0, true))
-    left.rows[3]:SetText(FormatGold(totals.questGold or 0, true))
-    left.rows[4]:SetText(FormatGold(totals.vendorGold or 0, true))
-    left.rows[5]:SetText(FormatGold(totals.auctionGold or 0, true))
-    left.rows[6]:SetText(FormatGold(otherIncome, true))
+    left.rows[2]:SetText(FormatGold(totals.internalGuildGold or 0, true))
+    left.rows[3]:SetText(totals.warbandGoldSeen and FormatGold(totals.warbandGold or 0, true) or "Unavailable")
+    left.rows[4]:SetText(FormatGold(totals.goldLooted or 0, true))
+    left.rows[5]:SetText(FormatGold(totals.questGold or 0, true))
+    left.rows[6]:SetText(FormatGold(totals.vendorGold or 0, true))
+    left.rows[7]:SetText(FormatGold(totals.auctionGold or 0, true))
+    left.rows[8]:SetText(FormatGold(otherIncome, true))
 
     middle.rows[1]:SetText(IRS:FormatCount(totals.auctionsPosted or 0))
     middle.rows[2]:SetText(IRS:FormatCount(totals.auctionPurchases or 0))
@@ -2980,8 +3056,10 @@ function IRS:RefreshUI()
     right.rows[1]:SetText(FormatGold(totals.travelSpent or 0, true))
     right.rows[2]:SetText(FormatGold(totals.postageSpent or 0, true))
     right.rows[3]:SetText(FormatGold(totals.transmogSpent or 0, true))
-    right.rows[4]:SetText(string.format("%d / %d", tracked, scanned))
-    right.rows[5]:SetText(totals.warbandGoldSeen and FormatGold(totals.warbandGold or 0, true) or "Unavailable")
+    right.rows[4]:SetText(FormatGold(totals.repairsSpent or 0, true))
+    right.rows[5]:SetText(FormatGold(totals.auctionSpent or 0, true))
+    right.rows[6]:SetText(FormatGold(totals.vendorSpent or 0, true))
+    right.rows[7]:SetText(string.format("%d / %d", tracked, scanned))
 
     if IRS.RefreshTokenDashboardCard then
         local tokenTiming = IRS:BeginStartupTiming("Token dashboard refresh")

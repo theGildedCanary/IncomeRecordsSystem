@@ -6,6 +6,39 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 
 ## [Unreleased]
 
+### Maintenance
+
+- Updated the release ZIP and addon validation workflows to `actions/checkout@v7`, which uses Node.js 24, to remove the deprecated Node.js 20 action warning.
+
+## [1.3.3] - 2026-10-14
+
+### Added
+
+- Added a saved, account-wide tracking start date beside Account Overview. Enter `YYYY-MM-DD` and press Enter to filter recorded income, auction activity, and spending from that date onward.
+- Added current tracked Guild Bank and last-known Warband Bank balances beneath Total Gold Acquired, with a pale divider separating these amounts from the individual income sources.
+- Added Repairs, Auction Expenses, and Vendor Purchases beneath Transmog, with a divider above Tracking Coverage. These spending categories begin recording with this update and follow the selected tracking date.
+- Added **Show character gold profit per hour** under Settings > Toggles > General Toggles. The active character's hourly net profit appears as a centered gold amount beneath Today/Week/Month/Total and beneath the character's Net Today in the Mini Dashboard. It updates while visible and resets on login or UI reload.
+
+### Changed
+
+- Account Overview now uses date-filtered IRS records instead of account-wide Blizzard lifetime totals; bank balances continue to show their latest known values.
+- Renamed Travel to Flight Paths.
+- Largest Sale and Largest Bid display `0g` when no value is recorded. Asterisks identify the limitation that IRS can only detect new Blizzard lifetime records observed during the selected period.
+- Other Income includes unmatched external wallet gains, including trades and NPC patron/player crafting-order commissions, when the gold is received.
+- Updated the README and in-addon User's Manual for the new dashboard controls and tracking behavior.
+
+### Fixed
+
+- Recorded Other Income directly from external wallet gains, then reclassified only recent matching amounts into loot, quest, vendor, or auction income. Excess or stale Blizzard source statistics can no longer hide new unmatched payouts by forcing the selected period's Other Income to zero.
+- Kept recognized Warband Bank and internal Guild Bank transfers out of income; late transfer corrections remove the associated income.
+- Adjusted dashboard and Mini Dashboard spacing for the additional rows, dividers, and optional hourly display.
+
+### Tracking notes
+
+- New auction activity and spending records cannot reconstruct activity from before tracking was available. Earlier missing Other Income may also be unrecoverable from legacy records.
+- Auction Expenses includes confirmed wallet spending on purchases and posting deposits while the auction house is open. Guild-paid repairs do not reduce the character wallet and are excluded from Repairs.
+- Offline checks cover Lua 5.1 syntax, date filtering, wallet income, source matching, transfer corrections, spending classification, and hourly profit calculations. In-game rendering and live event behavior still require verification.
+
 ## [1.3.2] - 2026-10-13
 
 ### Fixed
