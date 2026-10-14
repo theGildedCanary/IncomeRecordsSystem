@@ -14,6 +14,7 @@ UI\LayoutStyle.lua
 
 # Feature modules that must exist before the main UI is built
 Features\Transfers.lua
+Features\AuctionMail.lua
 Features\TokenMarket.lua
 
 # Main UI creates the shared page frames used by later feature/UI modules

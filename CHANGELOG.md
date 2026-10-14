@@ -6,6 +6,15 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 
 ## [Unreleased]
 
+### Changed
+
+- Replaced Account Overview's Total Gold Acquired row with **Total Account Net**, showing the latest known gold on all saved characters (including those with income tracking disabled), the Warband Bank, and personal guild banks marked internal in Transfers. This balance is independent of the tracking start date.
+
+### Fixed
+
+- Auction Earnings now requires confirmed collection of seller-invoice auction mail and a matching external wallet gain, including manual and bulk collection. Ordinary/player mail, crafting-order payouts, purchase/refund mail, and Blizzard lifetime auction-statistic changes cannot qualify. Earlier auction entries without mail evidence are excluded from the Account Overview row while their original history stays saved.
+- Establish fresh Blizzard source-statistic baselines on the first scan after login or UI reload, preventing changes accumulated since a previous session from being classified as newly observed auction income, auction activity, or spending. Existing recorded history remains available for the selected Account Overview date range.
+
 ### Maintenance
 
 - Updated the release ZIP and addon validation workflows to `actions/checkout@v7`, which uses Node.js 24, to remove the deprecated Node.js 20 action warning.

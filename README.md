@@ -76,15 +76,22 @@ and press Enter. The date is saved account-wide and includes that day's recorded
 activity. Income, auction activity, and spending use available IRS records since
 the selected date; Reports keeps Blizzard lifetime Wealth statistics separate.
 
-Total Gold Acquired is gross external wallet income after recognized internal
-transfer corrections. Guild Bank and Warband Bank sit beneath it, above a pale
+**Total Account Net** adds the latest known gold on all saved characters,
+including characters with income tracking disabled, plus the Warband Bank and
+guild banks selected as internal in Transfers. It shows the current known account
+balance independently of the tracking start date. Guild Bank and Warband Bank
+sit beneath it, above a pale
 divider and the individual income sources. Bank amounts show the latest known
 balances, rather than activity since the date; access a tracked Guild Bank to
 refresh its balance.
 
 Every positive external wallet gain starts in **Other Income**. Recent matching
-loot, quest, vendor, or auction statistics move only received amounts into those
-categories. Unmatched gains, including trades and NPC patron/player crafting-order
+loot, quest, or vendor statistics move only received amounts into those categories.
+**Auction Earnings** requires collected auction-sale mail with a seller invoice
+and a matching external wallet gain. Blizzard auction statistics, ordinary mail,
+crafting-order mail, and purchase/refund mail cannot classify Auction Earnings.
+Earlier auction entries without saved mail evidence are excluded from this row;
+the original recorded history remains saved. Unmatched gains, including trades and NPC patron/player crafting-order
 commissions, stay in Other Income. Order gold counts when received in the wallet;
 item and material rewards do not count as gold. Spending does not reduce gross
 Other Income, and recognized internal-transfer corrections remove matching income.

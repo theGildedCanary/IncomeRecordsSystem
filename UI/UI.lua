@@ -533,7 +533,7 @@ local function BuildList(panel, heading, rows, dividerAfter)
 end
 
 BuildList(left, "INCOME SOURCES", {
-    "Total gold acquired",
+    "Total Account Net",
     "Guild Bank",
     "Warband Bank",
     "Gold looted",
@@ -542,6 +542,32 @@ BuildList(left, "INCOME SOURCES", {
     "Auction earnings",
     "Other income",
 }, 3)
+
+local accountNetHelp = CreateFrame("Frame", nil, left)
+accountNetHelp:SetPoint("TOPLEFT", left.labels[1], "TOPLEFT", -2, 2)
+accountNetHelp:SetPoint("BOTTOMRIGHT", left.rows[1], "BOTTOMRIGHT", 2, -3)
+accountNetHelp:EnableMouse(true)
+accountNetHelp:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:AddLine("Total Account Net")
+    GameTooltip:AddLine("Latest known gold on all saved characters, including characters with income tracking disabled, plus the Warband Bank and guild banks selected as internal in Transfers.", 1, 1, 1, true)
+    GameTooltip:AddLine("This balance is independent of the tracking start date. Log in to characters and access banks to refresh their balances.", 1, 1, 1, true)
+    GameTooltip:Show()
+end)
+accountNetHelp:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+local auctionIncomeHelp = CreateFrame("Frame", nil, left)
+auctionIncomeHelp:SetPoint("TOPLEFT", left.labels[7], "TOPLEFT", -2, 2)
+auctionIncomeHelp:SetPoint("BOTTOMRIGHT", left.rows[7], "BOTTOMRIGHT", 2, -3)
+auctionIncomeHelp:EnableMouse(true)
+auctionIncomeHelp:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:AddLine("Auction earnings")
+    GameTooltip:AddLine("Confirmed auction-sale gold collected from mail, within the selected tracking dates.", 1, 1, 1, true)
+    GameTooltip:AddLine("Earlier entries without auction-mail evidence are excluded from this row.", 1, 1, 1, true)
+    GameTooltip:Show()
+end)
+auctionIncomeHelp:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 local otherIncomeHelp = CreateFrame("Frame", nil, left)
 otherIncomeHelp:SetPoint("TOPLEFT", left.labels[8], "TOPLEFT", -2, 2)
@@ -3039,7 +3065,7 @@ function IRS:RefreshUI()
     characterRate:SetShown(IRS.db.settings.showCharacterProfitPerHour == true)
     characterRate:SetText(FormatGold(IRS:GetCharacterProfitPerHour(), true) .. " / hour (" .. shortName .. ")")
     local otherIncome = totals.otherIncome or 0
-    left.rows[1]:SetText(FormatGold(totals.totalAcquired or 0, true))
+    left.rows[1]:SetText(FormatGold(totals.totalAccountNet or 0, true))
     left.rows[2]:SetText(FormatGold(totals.internalGuildGold or 0, true))
     left.rows[3]:SetText(totals.warbandGoldSeen and FormatGold(totals.warbandGold or 0, true) or "Unavailable")
     left.rows[4]:SetText(FormatGold(totals.goldLooted or 0, true))

@@ -1222,18 +1222,22 @@ end
 -- Statistics can arrive after PLAYER_MONEY. Match only recent positive wallet
 -- entries for this character; a later statistic cannot erase old Other income.
 IRS.pendingIncomeSources = {}
-function IRS:MatchIncomeSource(amount, characterKey)
+function IRS:MatchIncomeSource(amount, characterKey, minimumSequence, auctionMailEvidence)
     local remaining = amount
     local now = ServerNow()
     local kept = {}
     for _, entry in ipairs(self.pendingIncomeSources) do
         if entry.remaining > 0 and now - entry.at <= 5 then
-            if entry.characterKey == characterKey and remaining > 0 then
+            if entry.characterKey == characterKey and remaining > 0
+                and (not minimumSequence or (entry.sequence or 0) >= minimumSequence) then
                 local matched = math.min(remaining, entry.remaining)
                 entry.remaining = entry.remaining - matched
                 remaining = remaining - matched
                 for _, bucket in ipairs(entry.buckets) do
                     bucket.otherIncome = math.max(0, (bucket.otherIncome or 0) - matched)
+                    if auctionMailEvidence then
+                        bucket.auctionMailIncome = (bucket.auctionMailIncome or 0) + matched
+                    end
                 end
             end
             if entry.remaining > 0 then kept[#kept + 1] = entry end
@@ -1243,7 +1247,7 @@ function IRS:MatchIncomeSource(amount, characterKey)
     return amount - remaining
 end
 
-function IRS:RecordEarnings(amount, sourceDeltas, characterKey, reversesTransfer)
+function IRS:RecordEarnings(amount, sourceDeltas, characterKey, reversesTransfer, sourceEvidence)
     if not IRS.db then IRS:EnsureDB() end
     -- "Earnings" is a net ledger: positive wallet changes are income and
     -- negative wallet changes are spending/losses.
@@ -1276,7 +1280,9 @@ function IRS:RecordEarnings(amount, sourceDeltas, characterKey, reversesTransfer
         end
         -- Prune expired entries before adding the new wallet gain.
         self:MatchIncomeSource(0, characterKey)
+        self.incomeSourceSequence = (self.incomeSourceSequence or 0) + 1
         self.pendingIncomeSources[#self.pendingIncomeSources + 1] = {
+            sequence = self.incomeSourceSequence,
             characterKey = characterKey, at = ServerNow(), remaining = amount,
             buckets = incomeBuckets,
         }
@@ -1346,10 +1352,20 @@ function IRS:RecordEarnings(amount, sourceDeltas, characterKey, reversesTransfer
         record.periodSourceEarnings.months[monthKey] = record.periodSourceEarnings.months[monthKey] or {}
     end
 
+    local classifiedAuction = 0
     for _, statName in ipairs(TRACKED_SOURCE_STATS) do
         local delta = math.max(0, math.floor(tonumber(sourceDeltas[statName]) or 0))
+        local verifiedAuction = statName == "auctionGold" and type(sourceEvidence) == "table"
+            and sourceEvidence.kind == "auctionMail"
+        -- Auction earnings require a collected seller invoice, never a lifetime
+        -- statistic jump or an unverified source-only ledger call.
+        if statName == "auctionGold" and not verifiedAuction then delta = 0 end
         if delta > 0 then
-            delta = self:MatchIncomeSource(delta, characterKey)
+            delta = self:MatchIncomeSource(delta, characterKey,
+                verifiedAuction and sourceEvidence.minimumSequence or nil, verifiedAuction)
+        end
+        if verifiedAuction and delta > 0 then
+            classifiedAuction = classifiedAuction + delta
         end
         if delta > 0 then
             tracking.sources[statName] = (tracking.sources[statName] or 0) + delta
@@ -1368,6 +1384,7 @@ function IRS:RecordEarnings(amount, sourceDeltas, characterKey, reversesTransfer
             end
         end
     end
+    return classifiedAuction
 end
 
 -- Saves the latest Blizzard source-stat values so the next scan can calculate
@@ -1384,6 +1401,9 @@ end
 -- Compares Blizzard source statistics against their previous baselines.
 -- Important: this function CLASSIFIES income sources; it does not decide the
 -- headline net gain/loss. Net money comes from HandleMoneyChange().
+-- Saved statistic baselines may be stale after logout or an addon upgrade.
+-- Use runtime-only readiness so each session starts with a fresh scan baseline.
+IRS.sessionStatBaselines = setmetatable({}, {__mode = "k"})
 function IRS:UpdateEarningsLedger(record, currentStats)
     local now = ServerNow()
     record.earningsTracker = record.earningsTracker or {}
@@ -1401,7 +1421,8 @@ function IRS:UpdateEarningsLedger(record, currentStats)
         return
     end
 
-    if not tracker.initialized or tracker.needsRebaseline then
+    if not tracker.initialized or tracker.needsRebaseline or not self.sessionStatBaselines[record] then
+        self.sessionStatBaselines[record] = true
         tracker.initialized = true
         tracker.startedAt = tracker.startedAt or now
         SaveTrackerBaseline(tracker, currentStats)
@@ -1925,6 +1946,7 @@ function IRS:GetOverviewTotals()
     self:GetOverviewDay()
     local overview = self.db.account.overview
     local totals = self:GetTotals()
+    totals.totalAccountNet = self:GetAccountLiquidGoldAllCharacters()
     for _, name in ipairs({"totalAcquired", "goldLooted", "questGold", "vendorGold", "auctionGold", "auctionsPosted", "auctionPurchases", "largestSale", "largestBid", "travelSpent", "postageSpent", "transmogSpent", "repairsSpent", "auctionSpent", "vendorSpent", "otherIncome"}) do totals[name] = 0 end
     for key, bucket in pairs(self.db.tracking.days) do
         if key >= overview.startDate then
@@ -1932,7 +1954,11 @@ function IRS:GetOverviewTotals()
             self:EnsureOtherIncome(bucket)
             totals.otherIncome = totals.otherIncome + math.min(bucket.income or 0, bucket.otherIncome)
             totals.totalAcquired = totals.totalAcquired + (tonumber(bucket.income) or 0)
-            for _, name in ipairs({"goldLooted", "questGold", "vendorGold", "auctionGold"}) do totals[name] = totals[name] + ((bucket.sources or {})[name] or 0) end
+            for _, name in ipairs({"goldLooted", "questGold", "vendorGold"}) do
+                totals[name] = totals[name] + ((bucket.sources or {})[name] or 0)
+            end
+            -- Older statistic-based entries cannot prove an auction-mail payout.
+            totals.auctionGold = totals.auctionGold + (bucket.auctionMailIncome or 0)
         end
     end
     for key, day in pairs(overview.days) do

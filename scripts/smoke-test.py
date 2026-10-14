@@ -209,3 +209,199 @@ assert(bucket.otherIncome == oldOther + 30000)
 GetServerTime = originalNow
 print('PASS excess legacy statistics cannot hide Other income; recent source matching, duplicate scans, spending, transfer reversals, stale statistics')
 ''')
+
+lua.execute('''
+-- Persisted lifetime baselines must not classify income during a fresh login.
+local record = IRS.db.characters[IRS:CharacterKey()]
+local day = select(1, IRS:GetPeriodKeys())
+local bucket = IRS.db.tracking.days[day]
+record.earningsTracker.lastStats.auctionGold = 1000000
+record.earningsTracker.lastStats.auctionsPosted = 10
+record.earningsTracker.lastStats.travelSpent = 1000
+IRS.sessionStatBaselines = setmetatable({}, {__mode='k'})
+IRS.pendingIncomeSources = {}
+local beforeAuction = bucket.sources.auctionGold or 0
+local beforeOther = bucket.otherIncome
+local beforeOverview = IRS:GetOverviewTotals()
+IRS:RecordEarnings(50000, {}, IRS:CharacterKey())
+IRS:UpdateEarningsLedger(record, {auctionGold=2000000, auctionsPosted=50, travelSpent=20000})
+assert((bucket.sources.auctionGold or 0) == beforeAuction)
+assert(bucket.otherIncome == beforeOther + 50000)
+assert(record.earningsTracker.lastStats.auctionGold == 2000000)
+local afterOverview = IRS:GetOverviewTotals()
+assert(afterOverview.auctionsPosted == beforeOverview.auctionsPosted)
+assert(afterOverview.travelSpent == beforeOverview.travelSpent)
+IRS:UpdateEarningsLedger(record, {auctionGold=2000000, auctionsPosted=50, travelSpent=20000})
+assert((bucket.sources.auctionGold or 0) == beforeAuction)
+-- Auction statistic changes remain unverified even after the session baseline.
+IRS.pendingIncomeSources = {}
+IRS:RecordEarnings(25000, {}, IRS:CharacterKey())
+IRS:UpdateEarningsLedger(record, {auctionGold=2025000, auctionsPosted=51, travelSpent=20000})
+assert(bucket.sources.auctionGold == beforeAuction)
+assert(bucket.otherIncome == beforeOther + 75000)
+print('PASS fresh login ignores saved statistic jumps; auction statistic changes cannot classify wallet income')
+''')
+
+lua.execute('''
+MAIL_TEST_HOOKS = {}
+function TakeInboxMoney() end
+function AutoLootMailItem() end
+function hooksecurefunc(name, callback) MAIL_TEST_HOOKS[name] = callback end
+function CreateFrame()
+    return {
+        RegisterEvent=function() end,
+        SetScript=function(_, name, callback) if name == 'OnEvent' then MAIL_TEST_EVENT = callback end end,
+    }
+end
+''')
+load('Features/AuctionMail.lua')
+lua.execute('''
+MAILS = {}
+function GetInboxNumItems() return #MAILS end
+function GetInboxHeaderInfo(i)
+    local m = MAILS[i]
+    return nil,nil,'Auction House','Mail subject',m.money,0
+end
+function GetInboxInvoiceInfo(i)
+    local m = MAILS[i]
+    return m.invoice,'Test item','Buyer',m.price or m.money,0,0,0
+end
+C_Mail = {GetCraftingOrderMailInfo = function(i) return MAILS[i].crafting and {} or nil end}
+IRS.pendingIncomeSources = {}
+local baseline = IRS:GetOverviewTotals()
+-- Seeing seller mail alone must not count as income.
+MAILS = {{invoice='seller', money=50000, price=50000}}
+IRS:RefreshAuctionMailInbox()
+assert(IRS:GetOverviewTotals().auctionGold == baseline.auctionGold)
+MAIL_TEST_HOOKS.TakeInboxMoney(1)
+MAIL_TEST_HOOKS.AutoLootMailItem(1) -- duplicate requests must not double count
+TEST_MONEY = TEST_MONEY + 50000
+IRS:HandleMoneyChange()
+IRS:FlushAuctionMailIncome()
+assert(IRS:GetOverviewTotals().auctionGold == baseline.auctionGold)
+-- Confirm removal after the wallet event (normal collection).
+MAILS[1].money = 0
+IRS:RefreshAuctionMailInbox()
+local after = IRS:GetOverviewTotals()
+assert(after.auctionGold == baseline.auctionGold + 50000)
+assert(after.totalAcquired == baseline.totalAcquired + 50000)
+assert(after.otherIncome == baseline.otherIncome)
+IRS:RefreshAuctionMailInbox()
+assert(IRS:GetOverviewTotals().auctionGold == after.auctionGold)
+-- Confirm mail first, then receive the wallet event.
+MAILS = {{invoice='seller', money=25000, price=25000}}
+IRS:RefreshAuctionMailInbox()
+IRS:BeginAuctionMailCollection(1)
+MAILS[1].money = 0
+IRS:RefreshAuctionMailInbox()
+assert(IRS:GetOverviewTotals().auctionGold == after.auctionGold)
+TEST_MONEY = TEST_MONEY + 25000
+IRS:HandleMoneyChange()
+IRS:FlushAuctionMailIncome()
+assert(IRS:GetOverviewTotals().auctionGold == after.auctionGold + 25000)
+-- Ordinary mail, crafting-order mail, buyer mail and pending sale invoices
+-- must remain Other income, regardless of sender or statistic changes.
+for _, m in ipairs({
+    {money=10000,price=10000},
+    {invoice='seller',money=10000,price=10000,crafting=true},
+    {invoice='buyer',money=10000,price=10000},
+    {invoice='seller_temp_invoice',money=10000,price=10000},
+}) do
+    local before = IRS:GetOverviewTotals()
+    MAILS = {m}
+    IRS:RefreshAuctionMailInbox()
+    IRS:BeginAuctionMailCollection(1)
+    TEST_MONEY = TEST_MONEY + 10000
+    IRS:HandleMoneyChange()
+    m.money = 0
+    IRS:RefreshAuctionMailInbox()
+    IRS:RecordEarnings(0, {auctionGold=10000}, IRS:CharacterKey())
+    local after = IRS:GetOverviewTotals()
+    assert(after.auctionGold == before.auctionGold)
+    assert(after.otherIncome == before.otherIncome + 10000)
+end
+-- Failure or removal without a collection request cannot authorize earnings.
+local before = IRS:GetOverviewTotals()
+MAILS = {{invoice='seller',money=40000,price=40000}}
+IRS:RefreshAuctionMailInbox()
+IRS:BeginAuctionMailCollection(1)
+IRS:CancelAuctionMailCollection()
+TEST_MONEY = TEST_MONEY + 40000
+IRS:HandleMoneyChange()
+MAILS[1].money = 0
+IRS:RefreshAuctionMailInbox()
+assert(IRS:GetOverviewTotals().auctionGold == before.auctionGold)
+assert(IRS:GetOverviewTotals().otherIncome == before.otherIncome + 40000)
+-- Already-pending unrelated income from before the request cannot be claimed.
+IRS.pendingIncomeSources = {}
+MAILS = {{invoice='seller',money=90000,price=90000}}
+IRS:RefreshAuctionMailInbox()
+IRS:RecordEarnings(90000, {}, IRS:CharacterKey())
+local before = IRS:GetOverviewTotals().auctionGold
+IRS:BeginAuctionMailCollection(1)
+MAILS[1].money = 0
+IRS:RefreshAuctionMailInbox()
+assert(IRS:GetOverviewTotals().auctionGold == before)
+print('PASS seller-mail proof, both event orders, duplicate refreshes, ordinary/crafting/buyer/pending mail exclusion, failed collections and unrelated prior income')
+''')
+
+lua.execute('''
+-- Closing the mailbox clears API contents without proving collection.
+MAIL_TEST_EVENT(nil, 'MAIL_SHOW')
+MAIL_TEST_EVENT(nil, 'MAIL_CLOSED')
+IRS.pendingIncomeSources = {}
+MAILS = {{invoice='seller',money=60000,price=60000}}
+MAIL_TEST_EVENT(nil, 'MAIL_SHOW')
+local before = IRS:GetOverviewTotals().auctionGold
+MAIL_TEST_HOOKS.TakeInboxMoney(1)
+TEST_MONEY = TEST_MONEY + 60000
+IRS:HandleMoneyChange()
+MAILS = {}
+MAIL_TEST_EVENT(nil, 'MAIL_CLOSED')
+MAIL_TEST_EVENT(nil, 'MAIL_INBOX_UPDATE')
+MAIL_TEST_EVENT(nil, 'PLAYER_MONEY')
+assert(IRS:GetOverviewTotals().auctionGold == before)
+-- Two identical auction mails can be collected independently in a batch.
+IRS.pendingIncomeSources = {}
+MAILS = {
+    {invoice='seller',money=10000,price=10000},
+    {invoice='seller',money=10000,price=10000},
+}
+MAIL_TEST_EVENT(nil, 'MAIL_SHOW')
+local before = IRS:GetOverviewTotals().auctionGold
+MAIL_TEST_HOOKS.TakeInboxMoney(1)
+MAIL_TEST_HOOKS.AutoLootMailItem(2)
+TEST_MONEY = TEST_MONEY + 20000
+IRS:HandleMoneyChange()
+MAILS[1].money, MAILS[2].money = 0, 0
+MAIL_TEST_EVENT(nil, 'MAIL_INBOX_UPDATE')
+assert(IRS:GetOverviewTotals().auctionGold == before + 20000)
+MAIL_TEST_EVENT(nil, 'MAIL_INBOX_UPDATE')
+assert(IRS:GetOverviewTotals().auctionGold == before + 20000)
+print('PASS native money/auto-loot hooks, mailbox close exclusion, identical seller-mail batch collection')
+''')
+
+lua.execute('''
+local originalCharacters = IRS.db.characters
+local originalGuilds = IRS.db.guildBanks
+local originalAccount = IRS.db.account
+local originalOwned = IRS:EnsureInternalTransferDB().ownedGuildBanks
+IRS.db.characters = {
+    a={money=100000,trackingEnabled=true},
+    b={money=200000,trackingEnabled=false},
+    c={money=300000},
+}
+IRS.db.guildBanks = {personal={money=400000},other={money=900000}}
+IRS:EnsureInternalTransferDB().ownedGuildBanks = {personal=true,other=false}
+IRS.db.account = {warbandGoldSeen=true,warbandGold=500000}
+assert(IRS:GetOverviewTotals().totalAccountNet == 1500000)
+IRS.db.account.overview.startDate = '2000-01-01'
+assert(IRS:GetOverviewTotals().totalAccountNet == 1500000)
+IRS:EnsureInternalTransferDB().ownedGuildBanks.personal = false
+assert(IRS:GetOverviewTotals().totalAccountNet == 1100000)
+IRS.db.account.warbandGoldSeen = false
+assert(IRS:GetOverviewTotals().totalAccountNet == 600000)
+IRS.db.characters, IRS.db.guildBanks, IRS.db.account = originalCharacters, originalGuilds, originalAccount
+IRS:EnsureInternalTransferDB().ownedGuildBanks = originalOwned
+print('PASS Total Account Net includes all character wallets, known Warband gold and selected guild banks, independent of tracking dates')
+''')
