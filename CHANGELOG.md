@@ -6,6 +6,16 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 
 ## [Unreleased]
 
+## [1.3.5] - 2026-10-15
+
+### Changed
+
+- Transfers now registers each character's guild during character scans, whether or not a Savings Project exists. Log in to each character to discover their guild, then open its bank to cache the balance.
+- Labeled guild bank ownership as **Personal** in Transfers, with Personal/Shared status shown for each bank. Personal banks count their last-known balance toward account funds, and transfers to or from them remain internal.
+
+### Fixed
+
+- Confirmed guild bank withdrawals to zero now clear the cached balance, preventing an emptied personal bank from inflating account funds. Unconfirmed zero readings continue to preserve the last-known balance.
 
 ## [1.3.4] - 2026-10-15
 
