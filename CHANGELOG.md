@@ -6,12 +6,21 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 
 ## [Unreleased]
 
+
+## [1.3.4] - 2026-10-15
+
 ### Changed
 
 - Replaced Account Overview's Total Gold Acquired row with **Total Account Net**, showing the latest known gold on all saved characters (including those with income tracking disabled), the Warband Bank, and personal guild banks marked internal in Transfers. This balance is independent of the tracking start date.
 
 ### Fixed
 
+- Added native transmog-NPC detection, retried transmog hooks when Blizzard UI modules load, and preserved transmog spending context across delayed bank-transfer matching. Added transmog diagnostics to `/irs debug`.
+- Fixed Repairs classification when the wallet event arrives before the repair action hook; single-item repairs and guild-paid repair exclusion remain supported.
+- Updated Transmog spending for the current outfit-application API and confirmed wallet charges, avoiding dependence on legacy per-slot success events and duplicate counting.
+- Matched Postage and Flight Paths to observed wallet charges instead of delayed lifetime statistics. Postage counts only the fee, excluding enclosed gold.
+- Fixed Auction Earnings when wallet and inbox updates occur before the secure collection hook; preserved removed seller invoices long enough to match the confirmed payout, and stopped treating empty crafting-mail metadata as evidence against a seller invoice.
+- Largest Sale now records confirmed auction-invoice sale prices, and Largest Bid records observed bids/purchases with wallet charges. Removed the asterisks and the requirement to exceed a Blizzard lifetime record.
 - Auction Earnings now requires confirmed collection of seller-invoice auction mail and a matching external wallet gain, including manual and bulk collection. Ordinary/player mail, crafting-order payouts, purchase/refund mail, and Blizzard lifetime auction-statistic changes cannot qualify. Earlier auction entries without mail evidence are excluded from the Account Overview row while their original history stays saved.
 - Establish fresh Blizzard source-statistic baselines on the first scan after login or UI reload, preventing changes accumulated since a previous session from being classified as newly observed auction income, auction activity, or spending. Existing recorded history remains available for the selected Account Overview date range.
 

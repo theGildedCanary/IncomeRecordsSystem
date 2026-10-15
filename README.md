@@ -104,9 +104,10 @@ Repairs, Auction Expenses, and Vendor Purchases begin recording with version
 mode or repair-all) or vendor purchases, and at the auction house as auction
 expenses (purchases and posting deposits). Guild-paid repairs are excluded.
 
-Missing historical activity cannot be reconstructed. Largest Sale/Bid entries
-marked with an asterisk only detect new Blizzard lifetime records observed during
-the selected period and show `0g` when none was recorded. Earlier missing Other
+Missing historical activity cannot be reconstructed. Largest Sale uses the sale
+price on confirmed collected auction invoices; Largest Bid uses observed bids and
+purchases with a corresponding wallet charge. Both follow the selected tracking
+date and show `0g` until a value is recorded. Earlier missing Other
 Income may not be recoverable from legacy records.
 
 ## Character Profit Per Hour
@@ -168,3 +169,10 @@ See the [`LICENSE`](LICENSE) file for the full terms.
 ## Author
 
 **Gilded Canary**
+
+Repair-all, transmog, postage, and flight-path charges are matched to actual
+wallet losses, including when the wallet event arrives before the action hook.
+Transmog supports the current outfit application API and does not count preview
+costs or repeated per-slot success notifications. Postage counts the mailing fee,
+excluding any gold enclosed in the message. Flight Paths and Postage no longer
+rely on delayed lifetime-statistic changes.

@@ -473,7 +473,7 @@ overviewDate:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:AddLine("Tracking start date (YYYY-MM-DD)")
     GameTooltip:AddLine("Press Enter to apply. Uses available IRS records since this date.", 1, 1, 1, true)
-    GameTooltip:AddLine("Auction counts and spending are observed from this update onward. Largest sale/bid detects new lifetime records only.", 1, 1, 1, true)
+    GameTooltip:AddLine("Auction activity and spending use transactions observed by IRS.", 1, 1, 1, true)
     GameTooltip:Show()
 end)
 overviewDate:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -585,8 +585,8 @@ otherIncomeHelp:SetScript("OnLeave", function() GameTooltip:Hide() end)
 BuildList(middle, "AUCTION ACTIVITY", {
     "Auctions posted",
     "Auction purchases",
-    "Largest sale*",
-    "Largest bid*",
+    "Largest sale",
+    "Largest bid",
 })
 
 BuildList(right, "SPENDING / COVERAGE", {

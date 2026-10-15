@@ -116,9 +116,11 @@ IRS:RecordEarnings(-100000, {}, IRS:CharacterKey(), true)
 assert(IRS:GetOverviewTotals().totalAcquired == before)
 IRS:RecordOverviewStatistics({auctionsPosted=104,travelSpent=9000,largestSale=500000}, {auctionsPosted=100,travelSpent=7000,largestSale=400000})
 IRS:RecordTransmogSpend(3000, IRS:CharacterKey())
+IRS.expenseRuntime.pending = {category="travelSpent", untilTime=GetServerTime()+3}
+IRS:RecordOverviewWalletExpense(2000)
 local overview = IRS:GetOverviewTotals()
 assert(overview.auctionsPosted == 4 and overview.travelSpent == 2000)
-assert(overview.transmogSpent == 3000 and overview.largestSale == 500000)
+assert(overview.transmogSpent == 3000 and overview.largestSale == 0)
 IRS.db.account.overview.days['2000-01-01'] = {travelSpent=99999}
 assert(IRS:GetOverviewTotals().travelSpent == 2000)
 IRS.characterRateStarted = GetServerTime() - 1800
@@ -303,7 +305,7 @@ assert(IRS:GetOverviewTotals().auctionGold == after.auctionGold + 25000)
 -- must remain Other income, regardless of sender or statistic changes.
 for _, m in ipairs({
     {money=10000,price=10000},
-    {invoice='seller',money=10000,price=10000,crafting=true},
+    {money=10000,price=10000,crafting=true},
     {invoice='buyer',money=10000,price=10000},
     {invoice='seller_temp_invoice',money=10000,price=10000},
 }) do
@@ -404,4 +406,187 @@ assert(IRS:GetOverviewTotals().totalAccountNet == 600000)
 IRS.db.characters, IRS.db.guildBanks, IRS.db.account = originalCharacters, originalGuilds, originalAccount
 IRS:EnsureInternalTransferDB().ownedGuildBanks = originalOwned
 print('PASS Total Account Net includes all character wallets, known Warband gold and selected guild banks, independent of tracking dates')
+''')
+
+lua.execute('''
+-- Reproduce secure post-hook ordering: wallet and inbox can both update first.
+MAIL_TEST_EVENT(nil, 'MAIL_CLOSED')
+IRS.pendingIncomeSources = {}
+MAILS = {{invoice='seller',money=55000,price=60000}}
+MAIL_TEST_EVENT(nil, 'MAIL_SHOW')
+local before = IRS:GetOverviewTotals()
+TEST_MONEY = TEST_MONEY + 55000
+IRS:HandleMoneyChange()
+MAILS[1].money = 0
+MAIL_TEST_EVENT(nil, 'MAIL_INBOX_UPDATE')
+MAIL_TEST_HOOKS.TakeInboxMoney(1)
+local after = IRS:GetOverviewTotals()
+assert(after.auctionGold == before.auctionGold + 55000)
+assert(after.largestSale == math.max(before.largestSale, 60000))
+assert(after.otherIncome == before.otherIncome)
+MAIL_TEST_HOOKS.TakeInboxMoney(1)
+assert(IRS:GetOverviewTotals().auctionGold == after.auctionGold)
+MAIL_TEST_EVENT(nil, 'MAIL_CLOSED')
+-- A crafting-mail API returning an empty table must not exclude seller invoices.
+C_Mail.GetCraftingOrderMailInfo = function() return {} end
+MAILS = {{invoice='seller',money=40000,price=45000}}
+MAIL_TEST_EVENT(nil, 'MAIL_SHOW')
+MAIL_TEST_HOOKS.TakeInboxMoney(1)
+TEST_MONEY = TEST_MONEY + 40000
+IRS:HandleMoneyChange()
+MAILS[1].money = 0
+MAIL_TEST_EVENT(nil, 'MAIL_INBOX_UPDATE')
+assert(IRS:GetOverviewTotals().auctionGold == after.auctionGold + 40000)
+assert(IRS:GetOverviewTotals().largestSale == after.largestSale)
+print('PASS wallet/inbox updates before secure mail hook; invoice gross largest sale, lower subsequent sale, empty crafting mail info')
+
+local testClock = 1000
+GetTime = function() return testClock end
+IRS.expenseRuntime = {merchantOpen=true}
+IRS.transmogRuntime.isOpen = false
+local before = IRS:GetOverviewTotals()
+-- Repair-all hook arrives after wallet event was provisionally called vendor.
+TEST_MONEY = TEST_MONEY - 4000
+IRS:HandleMoneyChange()
+IRS:ArmWalletExpense('repairsSpent', 4000)
+local after = IRS:GetOverviewTotals()
+assert(after.repairsSpent == before.repairsSpent + 4000)
+assert(after.vendorSpent == before.vendorSpent)
+-- Single-item repair before/after hooks, and ordinary vendor purchases.
+testClock = testClock + 10
+InRepairMode = function() return true end
+TEST_MONEY = TEST_MONEY - 1000
+IRS:HandleMoneyChange()
+InRepairMode = function() return false end
+assert(IRS:GetOverviewTotals().repairsSpent == before.repairsSpent + 5000)
+testClock = testClock + 10
+IRS:ArmWalletExpense('repairsSpent', 2500)
+TEST_MONEY = TEST_MONEY - 2500
+IRS:HandleMoneyChange()
+assert(IRS:GetOverviewTotals().repairsSpent == before.repairsSpent + 7500)
+IRS.expenseRuntime.merchantOpen = false
+-- Postage counts only the fee, even when sending additional gold.
+testClock = testClock + 10
+IRS:ArmWalletExpense('postageSpent', 60)
+TEST_MONEY = TEST_MONEY - 12060
+IRS:HandleMoneyChange()
+assert(IRS:GetOverviewTotals().postageSpent == before.postageSpent + 60)
+-- Flight path action followed by wallet event.
+testClock = testClock + 10
+IRS:ArmWalletExpense('travelSpent', 700)
+TEST_MONEY = TEST_MONEY - 700
+IRS:HandleMoneyChange()
+assert(IRS:GetOverviewTotals().travelSpent == before.travelSpent + 700)
+-- Modern transmog action: charge once, ignore repeated old success events.
+testClock = testClock + 10
+IRS:ArmWalletExpense('transmogSpent')
+TEST_MONEY = TEST_MONEY - 9000
+IRS:HandleMoneyChange()
+IRS:HandleTransmogSuccess()
+IRS:HandleTransmogSuccess()
+assert(IRS:GetOverviewTotals().transmogSpent == before.transmogSpent + 9000)
+testClock = testClock + 10
+IRS:ArmWalletExpense('transmogSpent') -- free/failed application: no wallet loss
+assert(IRS:GetOverviewTotals().transmogSpent == before.transmogSpent + 9000)
+-- Actual bid total may exceed the extra wallet charge when raising a bid.
+testClock = testClock + 10
+IRS.expenseRuntime.pending = nil
+IRS.expenseRuntime.auctionOpen = true
+IRS:ObserveAuctionBid(80000)
+TEST_MONEY = TEST_MONEY - 10000
+IRS:HandleMoneyChange()
+assert(IRS:GetOverviewTotals().largestBid == math.max(before.largestBid,80000))
+-- Commodity purchase/post-hook observes the actual total charged.
+testClock = testClock + 10
+TEST_MONEY = TEST_MONEY - 90000
+IRS:HandleMoneyChange()
+IRS:ObserveAuctionBid()
+assert(IRS:GetOverviewTotals().largestBid == math.max(before.largestBid,90000))
+GetTime = nil
+print('PASS spending wallet/action event orders, repair reclassification, single repair, postage fee isolation, flight paths, modern transmog deduplication, bids and commodity purchases')
+''')
+
+lua.execute('''
+MAIL_TEST_EVENT(nil, 'MAIL_CLOSED')
+IRS.pendingIncomeSources = {}
+local realInvoice = GetInboxInvoiceInfo
+local invoiceReady = false
+GetInboxInvoiceInfo = function(i) if invoiceReady then return realInvoice(i) end end
+GetInboxText = function() invoiceReady = true; return '',nil,nil,nil,true end
+MAILS = {{invoice='seller',money=15000,price=16000}}
+MAIL_TEST_EVENT(nil, 'MAIL_SHOW')
+local before = IRS:GetOverviewTotals().auctionGold
+MAIL_TEST_HOOKS.TakeInboxMoney(1)
+TEST_MONEY = TEST_MONEY + 15000
+IRS:HandleMoneyChange()
+MAILS[1].money = 0
+MAIL_TEST_EVENT(nil, 'MAIL_INBOX_UPDATE')
+assert(IRS:GetOverviewTotals().auctionGold == before + 15000)
+GetInboxInvoiceInfo, GetInboxText = realInvoice, nil
+print('PASS bulk-mail invoice data hydration before collection')
+''')
+
+lua.execute('''
+-- No frame name, no legacy open event, and no application hook: native NPC
+-- context must still classify a real charge.
+local atTransmogNPC = true
+C_Transmog = {IsAtTransmogNPC=function() return atTransmogNPC end}
+TransmogFrame, WardrobeFrame = nil, nil
+IRS.transmogRuntime.isOpen = false
+IRS.expenseRuntime = {merchantOpen=false,auctionOpen=false}
+local before = IRS:GetOverviewTotals().transmogSpent
+TEST_MONEY = TEST_MONEY - 6100
+IRS:HandleMoneyChange()
+assert(IRS:GetOverviewTotals().transmogSpent == before + 6100)
+-- Install the application API after IRS loaded, and verify idempotent hooks.
+local hookCalls = 0
+hooksecurefunc = function(api, name, callback)
+    local original = api[name]
+    api[name] = function(...)
+        local result = original(...)
+        hookCalls = hookCalls + 1
+        callback(...)
+        return result
+    end
+end
+C_TransmogOutfitInfo = {CommitAndApplyAllPending=function() end}
+IRS:InstallTransmogTrackingHooks()
+IRS:InstallTransmogTrackingHooks()
+local clock = 100
+GetTime = function() return clock end
+C_TransmogOutfitInfo.CommitAndApplyAllPending(false)
+assert(hookCalls == 1)
+atTransmogNPC = false
+clock = clock + 10 -- charge after the NPC UI closes, outside the old 3s marker
+TEST_MONEY = TEST_MONEY - 7200
+IRS:HandleMoneyChange()
+assert(IRS:GetOverviewTotals().transmogSpent == before + 13300)
+IRS:HandleTransmogSuccess()
+assert(IRS:GetOverviewTotals().transmogSpent == before + 13300)
+-- A wardrobe collection browser away from the NPC is not spending context.
+clock = clock + 10
+IRS.expenseRuntime.pending = nil
+WardrobeFrame = {IsShown=function() return true end}
+assert(not IRS:IsAtTransmogService())
+WardrobeFrame = nil
+-- Preserve transmog context if transfer matching defers an unmatched charge.
+local timers = {}
+local originalAfter = C_Timer.After
+C_Timer.After = function(_, callback) timers[#timers+1] = callback end
+atTransmogNPC = true
+IRS.warbandBankRuntime.isOpen = true
+local beforeDeferred = IRS:GetOverviewTotals().transmogSpent
+TEST_MONEY = TEST_MONEY - 8300
+IRS:HandleMoneyChange()
+assert(IRS:GetOverviewTotals().transmogSpent == beforeDeferred)
+assert(#timers > 0)
+atTransmogNPC = false
+IRS.warbandBankRuntime.isOpen = false
+clock = clock + 10
+IRS:FinalizePendingInternalWallet(IRS.internalTransferRuntime.nextWalletId)
+assert(IRS:GetOverviewTotals().transmogSpent == beforeDeferred + 8300, tostring(IRS:GetOverviewTotals().transmogSpent)..' expected '..tostring(beforeDeferred+8300)..' pending '..tostring(#IRS.internalTransferRuntime.pendingWallet))
+IRS:FinalizePendingInternalWallet(IRS.internalTransferRuntime.nextWalletId)
+assert(IRS:GetOverviewTotals().transmogSpent == beforeDeferred + 8300, tostring(IRS:GetOverviewTotals().transmogSpent)..' expected '..tostring(beforeDeferred+8300)..' pending '..tostring(#IRS.internalTransferRuntime.pendingWallet))
+C_Timer.After, GetTime = originalAfter, nil
+print('PASS native transmog NPC detection without UI flags, late API loading, idempotent hooks, delayed closed-UI payment and transfer-deferred expense context')
 ''')

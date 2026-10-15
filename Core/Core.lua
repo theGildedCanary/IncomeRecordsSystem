@@ -1227,7 +1227,7 @@ function IRS:MatchIncomeSource(amount, characterKey, minimumSequence, auctionMai
     local now = ServerNow()
     local kept = {}
     for _, entry in ipairs(self.pendingIncomeSources) do
-        if entry.remaining > 0 and now - entry.at <= 5 then
+        if entry.remaining > 0 and now - entry.at <= (auctionMailEvidence and 30 or 5) then
             if entry.characterKey == characterKey and remaining > 0
                 and (not minimumSequence or (entry.sequence or 0) >= minimumSequence) then
                 local matched = math.min(remaining, entry.remaining)
@@ -1283,6 +1283,7 @@ function IRS:RecordEarnings(amount, sourceDeltas, characterKey, reversesTransfer
         self.incomeSourceSequence = (self.incomeSourceSequence or 0) + 1
         self.pendingIncomeSources[#self.pendingIncomeSources + 1] = {
             sequence = self.incomeSourceSequence,
+            walletAfter = GetMoney and GetMoney() or nil,
             characterKey = characterKey, at = ServerNow(), remaining = amount,
             buckets = incomeBuckets,
         }
@@ -1538,6 +1539,8 @@ function IRS:RecordTransmogSpend(amount, characterKey)
     local record = characterKey and IRS.db.characters[characterKey]
     if record and record.trackingEnabled == false then return end
 
+    self.transmogRuntime.lastCharge = amount
+    self.transmogRuntime.lastChargeAt = ServerNow()
     IRS.db.spending = IRS.db.spending or {}
     local day = self:GetOverviewDay()
     day.transmogSpent = (day.transmogSpent or 0) + amount
@@ -1553,17 +1556,8 @@ end
 -- TRANSMOGRIFY_SUCCESS can fire once per slot, so transactionRecorded prevents
 -- a multi-slot outfit from being counted multiple times.
 function IRS:HandleTransmogSuccess()
-    local state = IRS.transmogRuntime
-    if not state or state.transactionRecorded then return end
-
-    local amount = math.max(0, math.floor(tonumber(state.armedCost) or 0))
-    if amount > 0 then
-        IRS:RecordTransmogSpend(amount, IRS:CharacterKey())
-        state.transactionRecorded = true
-        state.pendingCost = 0
-        state.armedCost = 0
-        if IRS.RefreshUI then IRS:RefreshUI() end
-    end
+    -- Actual wallet loss is authoritative; success can fire once per slot.
+    self:HandleMoneyChange()
 end
 
 -- MAIN NET-PROFIT / LOSS TRACKER.
@@ -1901,7 +1895,7 @@ function IRS:SetOverviewStartDate(key)
 end
 function IRS:RecordOverviewStatistics(current, previous)
     local day = self:GetOverviewDay()
-    for _, name in ipairs({"auctionsPosted", "auctionPurchases", "travelSpent", "postageSpent", "largestSale", "largestBid"}) do
+    for _, name in ipairs({"auctionsPosted", "auctionPurchases"}) do
         local value, baseline = current[name], previous[name]
         if type(value) == "number" and type(baseline) == "number" and value > baseline then
             if name == "largestSale" or name == "largestBid" then day[name] = math.max(day[name] or 0, value)
@@ -1909,38 +1903,139 @@ function IRS:RecordOverviewStatistics(current, previous)
         end
     end
 end
--- Classify confirmed wallet spending while the matching service is open.
+-- Expense actions and PLAYER_MONEY can arrive in either order. Retain the
+-- last observed expense so a post-hook can correct a provisional category.
 IRS.expenseRuntime = {merchantOpen = false, auctionOpen = false}
-if hooksecurefunc and RepairAllItems then
-    hooksecurefunc("RepairAllItems", function(useGuildBank)
-        if not useGuildBank then
-            IRS.expenseRuntime.repairUntil = (GetTime and GetTime() or ServerNow()) + 2
+local function ExpenseNow() return GetTime and GetTime() or ServerNow() end
+local function AddExpense(category, amount, day)
+    if amount <= 0 or not category then return end
+    if category == "transmogSpent" then
+        IRS:RecordTransmogSpend(amount, IRS:CharacterKey())
+    else day[category] = (day[category] or 0) + amount end
+end
+function IRS:ArmWalletExpense(category, limit)
+    local state = self.expenseRuntime
+    local now = ExpenseNow()
+    local recent = state.lastExpense
+    if recent and recent.at == now then
+        local matched = math.min(recent.amount, tonumber(limit) or recent.amount)
+        if recent.category ~= category then
+            if recent.category then
+                recent.day[recent.category] = math.max(0, (recent.day[recent.category] or 0) - matched)
+            end
+            AddExpense(category, matched, recent.day)
         end
-    end)
+        recent.claimed = true
+        if state.pendingBid then
+            recent.day.largestBid = math.max(recent.day.largestBid or 0, state.pendingBid.amount or matched)
+            state.pendingBid = nil
+        end
+        state.pending = nil
+    else
+        state.pending = {category=category, limit=tonumber(limit), untilTime=now+3}
+    end
+    self:HandleMoneyChange()
+    if self.RefreshUI then self:RefreshUI() end
+end
+function IRS:IsAtTransmogService()
+    if C_Transmog and C_Transmog.IsAtTransmogNPC then
+        local ok, active = pcall(C_Transmog.IsAtTransmogNPC)
+        if ok and active then return true end
+    end
+    if self.transmogRuntime and self.transmogRuntime.isOpen then return true end
+    for _, name in ipairs({"TransmogFrame", "WardrobeFrame"}) do
+        local frame = _G[name]
+        if frame and frame.IsShown and frame:IsShown() then
+            -- Wardrobe can also open as a collection browser away from the NPC.
+            if name == "TransmogFrame" then return true end
+        end
+    end
+    return false
+end
+
+function IRS:RecordOverviewWalletExpense(amount, forcedCategory)
+    if amount <= 0 then return end
+    local state, now = self.expenseRuntime, ExpenseNow()
+    local pending = state.pending
+    local category, limit, claimed
+    if forcedCategory == "transmogSpent" or self:IsAtTransmogService() then
+        category = "transmogSpent"
+        if pending and pending.category == category then state.pending = nil end
+    elseif pending and now <= pending.untilTime then
+        category, limit, claimed = pending.category, pending.limit, true
+        state.pending = nil
+    elseif state.merchantOpen then
+        category = InRepairMode and InRepairMode() and "repairsSpent" or "vendorSpent"
+        if state.repairUntil and now <= state.repairUntil then
+            category = "repairsSpent"; state.repairUntil = nil
+        end
+    elseif state.auctionOpen then category = "auctionSpent" end
+    local classified = math.min(amount, limit or amount)
+    local day = self:GetOverviewDay()
+    AddExpense(category, classified, day)
+    if category == "auctionSpent" and state.pendingBid and now <= state.pendingBid.untilTime then
+        day.largestBid = math.max(day.largestBid or 0, state.pendingBid.amount or classified)
+        state.pendingBid = nil
+    end
+    state.lastExpense = {at=now, amount=classified, category=category, day=day, claimed=claimed}
+end
+function IRS:ObserveAuctionBid(amount)
+    self.expenseRuntime.pendingBid = {amount=tonumber(amount), untilTime=ExpenseNow()+3}
+    self:ArmWalletExpense("auctionSpent")
 end
 if hooksecurefunc then
+    if C_AuctionHouse and C_AuctionHouse.PlaceBid then
+        hooksecurefunc(C_AuctionHouse, "PlaceBid", function(_, amount) IRS:ObserveAuctionBid(amount) end)
+    end
+    if C_AuctionHouse and C_AuctionHouse.ConfirmCommoditiesPurchase then
+        hooksecurefunc(C_AuctionHouse, "ConfirmCommoditiesPurchase", function() IRS:ObserveAuctionBid() end)
+    end
+    if RepairAllItems then
+        hooksecurefunc("RepairAllItems", function(useGuildBank)
+            if useGuildBank then
+                IRS.expenseRuntime.pending = nil
+                IRS.expenseRuntime.repairUntil = nil
+            else IRS:ArmWalletExpense("repairsSpent", IRS.expenseRuntime.repairQuote) end
+        end)
+    end
     for _, api in ipairs({"BuyMerchantItem", "BuybackItem"}) do
-        if _G[api] then
-            hooksecurefunc(api, function() IRS.expenseRuntime.repairUntil = nil end)
+        if _G[api] then hooksecurefunc(api, function() IRS:ArmWalletExpense("vendorSpent") end) end
+    end
+    if TakeTaxiNode then
+        hooksecurefunc("TakeTaxiNode", function(index)
+            IRS:ArmWalletExpense("travelSpent", IRS.expenseRuntime.taxiQuotes and IRS.expenseRuntime.taxiQuotes[index])
+        end)
+    end
+    if SendMail then
+        hooksecurefunc("SendMail", function() IRS:ArmWalletExpense("postageSpent", IRS.expenseRuntime.postageQuote or 30) end)
+    end
+end
+
+-- APIs may become available when Blizzard's load-on-demand wardrobe loads.
+local transmogHooks = setmetatable({}, {__mode="k"})
+function IRS:InstallTransmogTrackingHooks()
+    if not hooksecurefunc then return end
+    for _, namespace in ipairs({"C_TransmogOutfitInfo", "C_Transmog"}) do
+        local api = _G[namespace]
+        if api then
+            transmogHooks[api] = transmogHooks[api] or {}
+            for _, name in ipairs({"CommitAndApplyAllPending", "ApplyAllPending"}) do
+                if type(api[name]) == "function" and not transmogHooks[api][name] then
+                    hooksecurefunc(api, name, function()
+                        IRS.transmogRuntime.lastApplyAt = ServerNow()
+                        IRS:ArmWalletExpense("transmogSpent")
+                        if IRS.expenseRuntime.pending then
+                            IRS.expenseRuntime.pending.untilTime = ExpenseNow()+30
+                        end
+                    end)
+                    transmogHooks[api][name] = true
+                    self.transmogRuntime.hookCount = (self.transmogRuntime.hookCount or 0)+1
+                end
+            end
         end
     end
 end
-function IRS:RecordOverviewWalletExpense(amount)
-    if amount <= 0 then return end
-    local state = self.expenseRuntime
-    local now = GetTime and GetTime() or ServerNow()
-    local category
-    if state.merchantOpen then
-        if (InRepairMode and InRepairMode()) or (state.repairUntil and now <= state.repairUntil) then
-            category = "repairsSpent"
-            state.repairUntil = nil
-        else category = "vendorSpent" end
-    elseif state.auctionOpen then category = "auctionSpent" end
-    if category then
-        local day = self:GetOverviewDay()
-        day[category] = (day[category] or 0) + amount
-    end
-end
+IRS:InstallTransmogTrackingHooks()
 
 function IRS:GetOverviewTotals()
     self:GetOverviewDay()
@@ -4325,6 +4420,9 @@ eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_MONEY")
 eventFrame:RegisterEvent("MERCHANT_SHOW")
 eventFrame:RegisterEvent("MERCHANT_CLOSED")
+eventFrame:RegisterEvent("MERCHANT_UPDATE")
+eventFrame:RegisterEvent("TAXIMAP_OPENED")
+eventFrame:RegisterEvent("MAIL_SEND_INFO_UPDATE")
 eventFrame:RegisterEvent("AUCTION_HOUSE_SHOW")
 eventFrame:RegisterEvent("AUCTION_HOUSE_CLOSED")
 eventFrame:RegisterEvent("PLAYER_LEVEL_UP")
@@ -4350,6 +4448,8 @@ eventFrame:RegisterEvent("GUILDBANKFRAME_OPENED")
 eventFrame:RegisterEvent("GUILDBANKFRAME_CLOSED")
 eventFrame:RegisterEvent("GUILDBANK_UPDATE_MONEY")
 eventFrame:RegisterEvent("PLAYER_GUILD_UPDATE")
+eventFrame:RegisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_SHOW")
+eventFrame:RegisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_HIDE")
 eventFrame:RegisterEvent("TRANSMOGRIFY_OPEN")
 eventFrame:RegisterEvent("TRANSMOGRIFY_UPDATE")
 eventFrame:RegisterEvent("TRANSMOGRIFY_SUCCESS")
@@ -4389,9 +4489,30 @@ local function QueueMoneyScans()
 end
 
 eventFrame:SetScript("OnEvent", function(_, event, arg1)
-    if event == "MERCHANT_SHOW" then
+    if event == "ADDON_LOADED" then IRS:InstallTransmogTrackingHooks() end
+    if (event == "PLAYER_INTERACTION_MANAGER_FRAME_SHOW" or event == "PLAYER_INTERACTION_MANAGER_FRAME_HIDE")
+        and Enum and Enum.PlayerInteractionType and arg1 == Enum.PlayerInteractionType.Transmogrifier then
+        IRS.transmogRuntime.isOpen = event == "PLAYER_INTERACTION_MANAGER_FRAME_SHOW"
+        IRS:InstallTransmogTrackingHooks()
+        return
+    end
+    if event == "MERCHANT_UPDATE" or event == "MERCHANT_SHOW" then
+        if GetRepairAllCost then
+            local cost = GetRepairAllCost()
+            if type(cost) == "number" and cost > 0 then IRS.expenseRuntime.repairQuote = cost end
+        end
+        if event == "MERCHANT_UPDATE" then return end
         IRS.expenseRuntime.merchantOpen = true
         IRS.expenseRuntime.repairUntil = nil
+        return
+    elseif event == "TAXIMAP_OPENED" then
+        IRS.expenseRuntime.taxiQuotes = {}
+        if NumTaxiNodes and TaxiNodeCost then
+            for i=1, NumTaxiNodes() do IRS.expenseRuntime.taxiQuotes[i] = TaxiNodeCost(i) end
+        end
+        return
+    elseif event == "MAIL_SEND_INFO_UPDATE" then
+        if GetSendMailPrice then IRS.expenseRuntime.postageQuote = GetSendMailPrice() end
         return
     elseif event == "MERCHANT_CLOSED" then
         IRS.expenseRuntime.merchantOpen = false
@@ -4563,6 +4684,11 @@ SlashCmdList.INCOMERECORDSSYSTEM = function(msg)
             IRS:FormatMoney(stats.totalAcquired or 0, true),
             IRS:FormatMoney(sourceTracked, true)))
 
+        print(string.format("|cff46d9ffIRS transmog:|r at NPC %s • hooks %d • last apply %s • last charge %s • tracked total %s",
+            tostring(IRS:IsAtTransmogService()), IRS.transmogRuntime.hookCount or 0,
+            tostring(IRS.transmogRuntime.lastApplyAt or "none"),
+            IRS:FormatMoney(IRS.transmogRuntime.lastCharge or 0, true),
+            IRS:FormatMoney((IRS.db.spending or {}).transmog or 0, true)))
         local tx = IRS:GetTransactionSummary(debugDayKey)
         print(string.format(
             "|cff46d9ffIRS transactions:|r %d event%s • income %s • expense %s • internal %s • net %s • pending %d",

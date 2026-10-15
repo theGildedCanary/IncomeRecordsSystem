@@ -388,6 +388,9 @@ function IRS:FinalizePendingInternalWallet(walletId)
         entry.transactionId
     )
     if remaining ~= 0 then
+        if remaining < 0 and IRS.RecordOverviewWalletExpense then
+            IRS:RecordOverviewWalletExpense(-remaining, entry.expenseCategory)
+        end
         IRS:RecordEarnings(remaining, {}, entry.characterKey)
         if IRS.RecordTransactionLedgerEffect then
             IRS:RecordTransactionLedgerEffect(
@@ -428,6 +431,8 @@ local function QueueWallet(
     table.insert(runtime.pendingWallet, {
         id = id,
         amount = walletAmount,
+        expenseCategory = walletAmount < 0 and IRS.IsAtTransmogService
+            and IRS:IsAtTransmogService() and "transmogSpent" or nil,
         characterKey = characterKey,
         expectedStorageType = storageType,
         expectedStorageKey = storageKey,
