@@ -701,13 +701,13 @@ function IRS:BuildInternalTransferSettingsSection(parent)
 
     local guildTitle = MakeText(guildPanel, "label", COLORS.goldSoft, "LEFT")
     guildTitle:SetPoint("TOPLEFT", 12, -11)
-    guildTitle:SetText("OWNED GUILD BANKS")
+    guildTitle:SetText("PERSONAL GUILD BANKS")
 
     local guildDesc = MakeText(guildPanel, "helper", COLORS.muted, "LEFT")
     guildDesc:SetPoint("TOPLEFT", 12, -34)
     guildDesc:SetPoint("RIGHT", -12, 0)
     guildDesc:SetText(
-        "Internal Guild Banks count toward account gold using their last-known balance. Savings Project Guild Banks default to internal. Uncheck a shared bank to exclude its gold and count transfers to it as money leaving your finances."
+        "Guilds are registered as you log in to each character, with or without a Savings Project. Check a bank to tag it as personal: its last-known gold counts as your funds and transfers stay internal. Project banks default to personal. Open each bank to refresh its balance."
     )
 
     local scroll = CreateFrame(
@@ -727,7 +727,7 @@ function IRS:BuildInternalTransferSettingsSection(parent)
     empty:SetPoint("TOPLEFT", 8, -18)
     empty:SetWidth(550)
     empty:SetText(
-        "No Guild Banks are known yet. Open a Guild Bank once and IRS will add it here."
+        "No Guild Banks are known yet. Log in to a character in a guild and IRS will add it here."
     )
 
     settingsUI = {
@@ -755,7 +755,10 @@ local function EnsureGuildSettingRow(index)
 
     row.name = MakeText(row, "body", COLORS.text, "LEFT")
     row.name:SetPoint("TOPLEFT", 45, -8)
-    row.name:SetPoint("RIGHT", -12, 0)
+    row.name:SetPoint("RIGHT", -85, 0)
+
+    row.personal = MakeText(row, "helper", COLORS.goldSoft, "RIGHT")
+    row.personal:SetPoint("TOPRIGHT", -12, -8)
 
     row.meta = MakeText(row, "helper", COLORS.muted, "LEFT")
     row.meta:SetPoint("TOPLEFT", 45, -29)
@@ -794,6 +797,7 @@ function IRS:RefreshInternalTransferSettingsSection()
         row:SetPoint("TOPLEFT", 0, -((i - 1) * 58))
         row:SetWidth(width)
         row.check:SetChecked(IRS:IsInternalGuildBank(entry.key))
+        row.personal:SetText(IRS:IsInternalGuildBank(entry.key) and "Personal" or "Shared")
         row.name:SetText(record.name or entry.key or "Guild Bank")
 
         local parts = {}

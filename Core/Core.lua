@@ -1741,6 +1741,7 @@ function IRS:ScanCurrentCharacter()
     record.level = UnitLevel("player") or record.level or 0
     record.className = select(1, UnitClass("player")) or record.className or "Unknown"
     record.lastSeen = ServerNow()
+    IRS:RegisterCurrentGuildBank(record)
 
     local currentMoney = GetMoney and GetMoney() or record.money or 0
 
@@ -2496,6 +2497,22 @@ function IRS:GetCurrentGuildKey()
     return guildName .. "@" .. realm, guildName, realm
 end
 
+-- Discover membership independently of projects or access to bank money.
+-- Unknown balances stay nil until a successful bank scan.
+function IRS:RegisterCurrentGuildBank(character)
+    if not IRS.db then IRS:EnsureDB() end
+    local key, name, realm = IRS:GetCurrentGuildKey()
+    if character then character.guildKey = key end
+    if not key then return nil end
+
+    local record = IRS.db.guildBanks[key] or {}
+    IRS.db.guildBanks[key] = record
+    record.key = key
+    record.name = name
+    record.realm = realm
+    return key, record
+end
+
 -- Reads guild-bank money from BOTH APIs currently available on Retail.
 --
 -- Why both?
@@ -2567,6 +2584,7 @@ function IRS:ScanGuildBankGold(allowZero)
 
     local guildKey, guildName, realm = IRS:GetCurrentGuildKey()
     if not guildKey then return nil, nil, "no-guild" end
+    IRS:RegisterCurrentGuildBank()
 
     local runtime = IRS.guildBankRuntime or {}
     local canViewModern = false
@@ -2633,11 +2651,6 @@ function IRS:ScanGuildBankGold(allowZero)
         return amount, guildKey, "ok", sourceName
     end
 
-    -- Never overwrite a positive cached balance with a suspicious zero.
-    if (tonumber(record.money) or 0) > 0 then
-        return nil, guildKey, "zero-preserved", sourceName
-    end
-
     -- A zero is only accepted when Blizzard has explicitly fired the money
     -- update while IRS believes the bank is viewable/open, or when the caller
     -- requested a confirmed-zero scan under those same conditions.
@@ -2649,6 +2662,9 @@ function IRS:ScanGuildBankGold(allowZero)
         )
 
     if not zeroConfirmed then
+        if (tonumber(record.money) or 0) > 0 then
+            return nil, guildKey, "zero-preserved", sourceName
+        end
         return nil, guildKey, "zero-unconfirmed", sourceName
     end
 

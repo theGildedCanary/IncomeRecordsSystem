@@ -71,6 +71,49 @@ print('PASS projects, summaries, graph intervals, checkpoints, allocation, delet
 for name in ('Transfers', 'Reserves', 'Tools'):
     load(f'Features/{name}.lua')
 lua.execute('''
+local oldInGuild, oldGuildInfo = IsInGuild, GetGuildInfo
+local oldMoney, oldBank, oldEnum = GetGuildBankMoney, C_Bank, Enum
+local oldProjects = IRS.db.projects.items
+IRS.db.projects.items = {}
+IsInGuild = function() return true end
+GetGuildInfo = function() return 'NoProjectGuild', nil, nil, 'TestRealm' end
+IRS:ScanCurrentCharacter()
+local key = 'NoProjectGuild@TestRealm'
+assert(IRS.db.characters['Player-Test'].guildKey == key)
+assert(IRS.db.guildBanks[key] and IRS.db.guildBanks[key].money == nil)
+local found = false
+for _, row in ipairs(IRS:GetSortedGuildBanks()) do
+    if row.key == key then found = true end
+end
+assert(found and not IRS:IsInternalGuildBank(key))
+GetGuildBankMoney = function() return 400000 end
+C_Bank, Enum = nil, nil
+assert(IRS:ScanGuildBankGold(false) == 400000)
+local baseline = IRS:GetAccountLiquidGoldAllCharacters()
+IRS:SetInternalGuildBank(key, true)
+assert(IRS:GetAccountLiquidGoldAllCharacters() == baseline + 400000)
+local oldOpen, oldUpdate = IRS.guildBankRuntime.isOpen, IRS.guildBankRuntime.hasMoneyUpdate
+IRS.guildBankRuntime.isOpen, IRS.guildBankRuntime.hasMoneyUpdate = false, false
+GetGuildBankMoney = function() return 0 end
+assert(IRS:ScanGuildBankGold(false) == nil)
+assert(IRS.db.guildBanks[key].money == 400000)
+IRS.guildBankRuntime.isOpen, IRS.guildBankRuntime.hasMoneyUpdate = true, true
+assert(IRS:ScanGuildBankGold(true) == 0)
+assert(IRS:GetAccountLiquidGoldAllCharacters() == baseline)
+IsInGuild = function() return false end
+IRS:ScanCurrentCharacter()
+assert(IRS.db.characters['Player-Test'].guildKey == nil)
+assert(IRS.db.guildBanks[key])
+IRS.guildBankRuntime.isOpen, IRS.guildBankRuntime.hasMoneyUpdate = oldOpen, oldUpdate
+IRS.db.guildBanks[key] = nil
+IRS:EnsureInternalTransferDB().ownedGuildBanks[key] = nil
+IRS.internalTransferRuntime.pendingStorage = {}
+IRS.db.projects.items = oldProjects
+IsInGuild, GetGuildInfo = oldInGuild, oldGuildInfo
+GetGuildBankMoney, C_Bank, Enum = oldMoney, oldBank, oldEnum
+print('PASS project-free guild registration, personal funds, confirmed empty bank and retained guild discovery')
+''')
+lua.execute('''
 local baseline=IRS:GetCurrentEarnings().today
 local delta,deferred=IRS:FilterInternalWalletChange(-200000,'Player-Test',100000,300000)
 assert(delta == 0 and not deferred)
