@@ -110,6 +110,19 @@ purchases with a corresponding wallet charge. Both follow the selected tracking
 date and show `0g` until a value is recorded. Earlier missing Other
 Income may not be recoverable from legacy records.
 
+## Income Adjustments
+
+Open **Tools > Adjustments** and enter a signed amount such as `+500g` or `-500g`.
+
+- **Daily Income Adjustment** corrects Today, This Week, This Month, and Total
+  Recorded for both the current character and account.
+- **Overall Income Adjustment** corrects **Account Total Recorded only**,
+  including account-total displays in Reports and the Micro Report. Character
+  totals, daily/weekly/monthly earnings, and distributable profit stay unchanged.
+
+Neither adjustment changes actual wallet or bank balances, Total Account Net,
+or income-source categories.
+
 ## Character Profit Per Hour
 
 Enable **Show character gold profit per hour** under **Settings > Toggles >
@@ -130,6 +143,13 @@ IRS can calculate how tracked profit should be distributed between your configur
 ## Transfers
 
 IRS attempts to distinguish transfers between storage locations you own from genuine income or spending.
+
+Guilds are registered as you log in to each character, whether or not a Savings
+Project exists. Open each guild bank to refresh its cached balance. In Transfers,
+check a bank to mark it **Personal**: its last-known gold counts toward account
+funds, and transfers to or from it stay internal. Shared banks remain excluded
+from personal funds. Guild banks used by Savings Projects default to Personal;
+you can uncheck them if they are shared.
 
 For example, moving gold between your character, Warband Bank, or known Guild Bank storage should not cause that gold to appear as newly earned income or as a loss simply because it changed locations.
 

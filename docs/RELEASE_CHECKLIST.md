@@ -10,6 +10,8 @@ Use this checklist when preparing a new public release.
 - [ ] In game, verify Projects tab/action labels, switching between Management and Allocation, selecting/creating projects, and changing font sizes. Offline tests do not verify rendering or live Blizzard events.
 - [ ] In game, verify Account Overview start-date entry, bank/source grouping and dividers, expense rows, and new external payouts appearing in Other Income. Check approved-source reclassification and internal bank-transfer exclusion.
 - [ ] In game, toggle character profit per hour in General Toggles; verify both dashboards, font scaling, live updates, and session reset after reload.
+- [ ] In game, verify Tools > Adjustments at supported font sizes. Apply positive and negative Overall Income Adjustments; confirm only Account Total Recorded changes (including Reports and Micro Report), survives reload, and leaves character totals, period earnings, actual funds, and distributable profit unchanged. Confirm Daily Income Adjustment still updates the current character and account periods/totals.
+- [ ] In game, log in to a guilded character without a Savings Project and confirm its guild appears in Transfers. Mark a bank Personal, verify its cached gold counts once toward account funds, and confirm a full withdrawal clears its cached balance after a confirmed money update.
 - [ ] Update `## Version:` in `IncomeRecordsSystem.toc`.
 - [ ] Move entries from **Unreleased** in `CHANGELOG.md` into a new version heading with the release date.
 - [ ] Add a fresh empty **Unreleased** section at the top of the changelog.

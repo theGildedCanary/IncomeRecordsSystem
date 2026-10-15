@@ -6,6 +6,8 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 
 ## [Unreleased]
 
+## [1.3.5] - 2026-10-15
+
 ### Added
 
 - Added **Overall Income Adjustment** in Tools to apply signed corrections to Account Total Recorded only. Character totals, daily/weekly/monthly earnings, actual funds, and distributable profit remain unchanged.
@@ -13,10 +15,6 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 ### Changed
 
 - Renamed the Tools **Daily Adjustment** tab to **Adjustments**, with separate Daily Income Adjustment and Overall Income Adjustment sections.
-
-## [1.3.5] - 2026-10-15
-
-### Changed
 
 - Transfers now registers each character's guild during character scans, whether or not a Savings Project exists. Log in to each character to discover their guild, then open its bank to cache the balance.
 - Labeled guild bank ownership as **Personal** in Transfers, with Personal/Shared status shown for each bank. Personal banks count their last-known balance toward account funds, and transfers to or from them remain internal.
