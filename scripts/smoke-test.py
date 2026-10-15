@@ -71,6 +71,37 @@ print('PASS projects, summaries, graph intervals, checkpoints, allocation, delet
 for name in ('Transfers', 'Reserves', 'Tools'):
     load(f'Features/{name}.lua')
 lua.execute('''
+local before = IRS:GetCurrentEarnings()
+local character = IRS:GetCharacterEarnings('Player-Test')
+local funds = IRS:GetAccountLiquidGoldAllCharacters()
+local distribution = IRS:GetProfitDistribution()
+local oldOffset = IRS.db.tracking.overallIncomeAdjustment
+local oldHistory = IRS.db.tracking.overallIncomeAdjustmentHistory
+assert(not IRS:AdjustAccountTotalEarnings(0))
+assert(not IRS:AdjustAccountTotalEarnings('invalid'))
+assert(not IRS:AdjustAccountTotalEarnings(math.huge))
+assert(not IRS:AdjustAccountTotalEarnings(0/0))
+assert(IRS:AdjustAccountTotalEarnings(5000000))
+assert(IRS:GetCurrentEarnings().total == before.total + 5000000)
+for _, field in ipairs({'today', 'week', 'month'}) do
+    assert(IRS:GetCurrentEarnings()[field] == before[field])
+end
+for _, field in ipairs({'today', 'week', 'month', 'total'}) do
+    assert(IRS:GetCharacterEarnings('Player-Test')[field] == character[field])
+end
+assert(IRS:GetAccountLiquidGoldAllCharacters() == funds)
+assert(IRS:GetProfitDistribution().availableProfit == distribution.availableProfit)
+assert(IRS:GetProfitDistribution().netSince == distribution.netSince)
+assert(IRS:AdjustAccountTotalEarnings(-7000000))
+assert(IRS:GetCurrentEarnings().total == before.total - 2000000)
+IRS:EnsureDB()
+assert(IRS:GetCurrentEarnings().total == before.total - 2000000)
+assert(#IRS.db.tracking.overallIncomeAdjustmentHistory >= 2)
+IRS.db.tracking.overallIncomeAdjustment = oldOffset
+IRS.db.tracking.overallIncomeAdjustmentHistory = oldHistory
+print('PASS account-only total corrections preserve character, periods, funds and distributable profit')
+''')
+lua.execute('''
 local oldInGuild, oldGuildInfo = IsInGuild, GetGuildInfo
 local oldMoney, oldBank, oldEnum = GetGuildBankMoney, C_Bank, Enum
 local oldProjects = IRS.db.projects.items

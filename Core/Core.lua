@@ -2086,7 +2086,7 @@ function IRS:GetCurrentEarnings()
         today = day.earned or 0,
         week = week.earned or 0,
         month = month.earned or 0,
-        total = tracking.totalEarned or 0,
+        total = (tracking.totalEarned or 0) + (tonumber(tracking.overallIncomeAdjustment) or 0),
         daySources = day.sources or {},
         weekSources = week.sources or {},
         monthSources = month.sources or {},
@@ -2143,6 +2143,26 @@ function IRS:AdjustCurrentCharacterEarnings(amount)
         amount = amount,
         characterKey = characterKey,
     }
+end
+
+-- Account-only correction, separate from wallet earnings and period history.
+function IRS:AdjustAccountTotalEarnings(amount)
+    if not IRS.db then IRS:EnsureDB() end
+    amount = tonumber(amount)
+    if not amount or amount ~= amount or math.abs(amount) == math.huge then
+        return false, "Adjustment must be a finite number."
+    end
+    amount = math.floor(amount)
+    if amount == 0 then return false, "Adjustment cannot be zero." end
+
+    local tracking = IRS.db.tracking
+    tracking.overallIncomeAdjustment = (tonumber(tracking.overallIncomeAdjustment) or 0) + amount
+    tracking.overallIncomeAdjustmentHistory = tracking.overallIncomeAdjustmentHistory or {}
+    table.insert(tracking.overallIncomeAdjustmentHistory, {at = ServerNow(), amount = amount})
+    while #tracking.overallIncomeAdjustmentHistory > 100 do
+        table.remove(tracking.overallIncomeAdjustmentHistory, 1)
+    end
+    return true, {amount = amount}
 end
 
 -- Returns the most recent N daily account-ledger entries for the dashboard graph.
@@ -2277,7 +2297,7 @@ function IRS:GetReportMetrics(characterKey)
         local record = IRS.db.characters[scopeKey]
         total = record and (record.earnedSinceTracking or 0) or 0
     else
-        total = IRS.db.tracking.totalEarned or 0
+        total = IRS:GetCurrentEarnings().total
     end
 
     return {

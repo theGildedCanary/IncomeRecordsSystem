@@ -6,6 +6,14 @@ The changelog tracks user-facing changes between releases. Add changes to **Unre
 
 ## [Unreleased]
 
+### Added
+
+- Added **Overall Income Adjustment** in Tools to apply signed corrections to Account Total Recorded only. Character totals, daily/weekly/monthly earnings, actual funds, and distributable profit remain unchanged.
+
+### Changed
+
+- Renamed the Tools **Daily Adjustment** tab to **Adjustments**, with separate Daily Income Adjustment and Overall Income Adjustment sections.
+
 ## [1.3.5] - 2026-10-15
 
 ### Changed

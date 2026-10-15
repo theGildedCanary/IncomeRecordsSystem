@@ -220,7 +220,7 @@ local function EnsureToolsDB()
 
     if state.baselineTotal == nil then
         local earnings = IRS:GetCurrentEarnings()
-        local total = math.floor(tonumber(earnings.total) or 0)
+        local total = math.floor(tonumber(IRS.db.tracking.totalEarned) or 0)
         local today = math.floor(tonumber(earnings.today) or 0)
         state.baselineTotal = total - math.max(0, today)
         state.initializedDay = TodayKey()
@@ -303,8 +303,8 @@ end
 
 function IRS:GetProfitDistribution()
     local state = EnsureToolsDB()
-    local earnings = IRS:GetCurrentEarnings()
-    local currentTotal = math.floor(tonumber(earnings.total) or 0)
+    -- Overall corrections are excluded from profit available for allocation.
+    local currentTotal = math.floor(tonumber(IRS.db.tracking.totalEarned) or 0)
     local baselineTotal = math.floor(tonumber(state.baselineTotal) or currentTotal)
     local netSince = currentTotal - baselineTotal
     local profit = math.max(0, netSince)
@@ -481,7 +481,7 @@ end
 
 local manualTab = MakeToolsTab("USER MANUAL", 132)
 manualTab:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", 0, -14)
-local adjustmentTab = MakeToolsTab("DAILY ADJUSTMENT", 160)
+local adjustmentTab = MakeToolsTab("ADJUSTMENTS", 160)
 adjustmentTab:SetPoint("LEFT", manualTab, "RIGHT", 8, 0)
 
 local tabsDivider = page:CreateTexture(nil, "ARTWORK")
@@ -554,9 +554,12 @@ local dailyAdjustmentStatus = MakeText(dailyAdjustmentPanel, "helper", COLORS.mu
 dailyAdjustmentStatus:SetPoint("TOPLEFT", dailyAdjustmentPanel, "TOPLEFT", 12, -76)
 dailyAdjustmentStatus:SetPoint("RIGHT", -12, 0)
 
+local RefreshOverallAdjustmentInfo
+
 local function RefreshDailyAdjustmentInfo()
     local characterKey = IRS:CharacterKey()
     local earnings = IRS:GetCharacterEarnings(characterKey)
+    if RefreshOverallAdjustmentInfo then RefreshOverallAdjustmentInfo() end
     dailyAdjustmentCharacter:SetText(string.format(
         "%s — Today: %s",
         IRS:CharacterLabel(),
@@ -597,6 +600,101 @@ dailyAdjustmentInput:SetScript("OnEnterPressed", function(self)
 end)
 dailyAdjustmentInput:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 
+
+local overallHeading = MakeText(adjustmentView, "section", COLORS.goldSoft, "LEFT")
+overallHeading:SetPoint("TOPLEFT", dailyAdjustmentPanel, "BOTTOMLEFT", 0, -24)
+overallHeading:SetText("OVERALL INCOME ADJUSTMENT")
+
+local overallIntro = MakeText(adjustmentView, "helper", COLORS.muted, "LEFT")
+overallIntro:SetPoint("TOPLEFT", overallHeading, "BOTTOMLEFT", 0, -4)
+overallIntro:SetPoint("TOPRIGHT", -4, 0)
+overallIntro:SetWordWrap(true)
+overallIntro:SetText("Correct Account Total Recorded only. Character totals, period earnings, and distributable profit stay unchanged.")
+
+local overallAdjustmentPanel = MakePanel(adjustmentView, COLORS.panel)
+overallAdjustmentPanel:SetPoint("TOPLEFT", overallIntro, "BOTTOMLEFT", 0, -10)
+overallAdjustmentPanel:SetPoint("TOPRIGHT", adjustmentView, "TOPRIGHT", 0, 0)
+overallAdjustmentPanel:SetHeight(90)
+
+local overallAdjustmentHeading = MakeText(overallAdjustmentPanel, "section", COLORS.goldSoft, "LEFT")
+overallAdjustmentHeading:SetPoint("TOPLEFT", 12, -8)
+overallAdjustmentHeading:SetText("ACCOUNT TOTAL RECORDED")
+
+local overallAdjustmentHelp = MakeText(overallAdjustmentPanel, "helper", COLORS.muted, "LEFT")
+overallAdjustmentHelp:SetPoint("TOPLEFT", overallAdjustmentHeading, "BOTTOMLEFT", 0, -3)
+overallAdjustmentHelp:SetPoint("TOPRIGHT", -12, 0)
+overallAdjustmentHelp:SetText("Enter a signed correction, such as +500g or -500g. Actual funds stay unchanged.")
+overallAdjustmentHelp:SetWordWrap(true)
+
+local overallAdjustmentCharacter = MakeText(overallAdjustmentPanel, "body", COLORS.text, "LEFT")
+overallAdjustmentCharacter:SetPoint("TOPLEFT", 12, -46)
+overallAdjustmentCharacter:SetWidth(370)
+
+local overallAdjustmentInputLabel = MakeText(overallAdjustmentPanel, "helper", COLORS.goldSoft, "RIGHT")
+overallAdjustmentInputLabel:SetPoint("TOPLEFT", 390, -47)
+overallAdjustmentInputLabel:SetWidth(112)
+overallAdjustmentInputLabel:SetText("ADJUSTMENT")
+
+local overallAdjustmentInput = CreateFrame("EditBox", nil, overallAdjustmentPanel, "InputBoxTemplate")
+overallAdjustmentInput:SetSize(100, 24)
+overallAdjustmentInput:SetPoint("LEFT", overallAdjustmentInputLabel, "RIGHT", 6, 0)
+overallAdjustmentInput:SetAutoFocus(false)
+overallAdjustmentInput:SetJustifyH("RIGHT")
+overallAdjustmentInput:SetFontObject(GameFontHighlightSmall)
+overallAdjustmentInput:SetMaxLetters(18)
+overallAdjustmentInput:SetNumeric(false)
+overallAdjustmentInput:SetText("")
+
+local overallAdjustmentButton = MakeButton(overallAdjustmentPanel, "APPLY", 0, 0, 100)
+overallAdjustmentButton:ClearAllPoints()
+overallAdjustmentButton:SetPoint("LEFT", overallAdjustmentInput, "RIGHT", 12, 0)
+overallAdjustmentButton:SetSize(92, 30)
+
+local overallAdjustmentStatus = MakeText(overallAdjustmentPanel, "helper", COLORS.muted, "LEFT")
+overallAdjustmentStatus:SetPoint("TOPLEFT", overallAdjustmentPanel, "TOPLEFT", 12, -76)
+overallAdjustmentStatus:SetPoint("RIGHT", -12, 0)
+
+RefreshOverallAdjustmentInfo = function()
+    local earnings = IRS:GetCurrentEarnings()
+    overallAdjustmentCharacter:SetText(string.format(
+        "Account Total Recorded: %s",
+        WholeGold(earnings.total, true)
+    ))
+end
+
+local function ApplyOverallAdjustment()
+    local amount = ParseSignedGoldInput(overallAdjustmentInput:GetText())
+    if not amount then
+        overallAdjustmentStatus:SetText("Enter a non-zero signed amount, such as +500g or -500g.")
+        SetColor(overallAdjustmentStatus, COLORS.red)
+        return
+    end
+
+    local success, result = IRS:AdjustAccountTotalEarnings(amount)
+    if not success then
+        overallAdjustmentStatus:SetText(tostring(result or "Could not apply the adjustment."))
+        SetColor(overallAdjustmentStatus, COLORS.red)
+        return
+    end
+
+    overallAdjustmentInput:SetText("")
+    overallAdjustmentStatus:SetText(
+        "Applied " .. WholeGold(result.amount, true)
+            .. " to Account Total Recorded only."
+    )
+    SetColor(overallAdjustmentStatus, COLORS.green)
+    RefreshOverallAdjustmentInfo()
+    if IRS.RefreshUI then IRS:RefreshUI() end
+    if IRS.RefreshMiniDashboard then IRS:RefreshMiniDashboard() end
+end
+
+overallAdjustmentButton:SetScript("OnClick", ApplyOverallAdjustment)
+overallAdjustmentInput:SetScript("OnEnterPressed", function(self)
+    ApplyOverallAdjustment()
+    self:ClearFocus()
+end)
+overallAdjustmentInput:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+
 local manualScroll = CreateFrame("ScrollFrame", "IncomeRecordsSystemToolsManualScroll", manualView, "UIPanelScrollFrameTemplate")
 manualScroll:SetPoint("TOPLEFT", 0, -48)
 manualScroll:SetPoint("BOTTOMRIGHT", -24, 0)
@@ -614,8 +712,8 @@ local MANUAL_SECTIONS = {
         "Today, This Week, This Month, and Total Recorded are IRS net values. Green means positive, red means negative. The smaller line under each account total is the current character's contribution. Daily Earnings shows recent day-by-day net results. Account Overview filters available IRS income, auction activity, and spending by a saved account-wide start date. Enter YYYY-MM-DD beside the heading and press Enter. Total Account Net sums the latest known gold on all saved characters, including characters with income tracking disabled, plus the Warband Bank and guild banks selected as internal in Transfers. This account balance is independent of the tracking start date; log in to characters and access banks to refresh cached balances. Guild Bank and Warband Bank show their latest known balances above a pale divider, followed by individual income sources. Other Income records unmatched external wallet gains, including trades and NPC patron/player crafting-order commissions, when gold reaches the wallet. Recent matching loot, quest, or vendor statistics reclassify only received amounts; older statistic totals cannot hide new Other Income. Auction Earnings counts only confirmed auction-sale gold collected from seller-invoice mail and matched to an external wallet gain. Ordinary mail, crafting-order mail, refunds, and Blizzard auction statistics cannot qualify. Earlier unverified auction entries are excluded from this row; recorded history remains saved. Spending lists Flight Paths, Postage, Transmog, Repairs, Auction Expenses, and Vendor Purchases, with Tracking Coverage below a divider. Auction Expenses includes purchases and posting deposits paid while the auction house is open; guild-paid repairs are excluded. Missing historical activity cannot be reconstructed. Largest Sale uses confirmed collected auction-invoice sale prices. Largest Bid uses observed bids and purchases matched to actual wallet charges. Both follow the selected tracking date and show 0g until recorded. Repairs, transmog, postage, and flight-path costs are matched to actual wallet losses; postage excludes gold enclosed in the message. Reports continues to show lifetime Wealth statistics separately."
     },
     {
-        "MANUAL DAILY INCOME ADJUSTMENT",
-        "Tools can apply a signed correction to the current character's and account-wide net earnings. Enter +500g to add 500 gold or -500g to subtract it. The correction updates Today, This Week, This Month, and Total Recorded, but does not change wallet gold or source-category totals."
+        "MANUAL INCOME ADJUSTMENTS",
+        "Tools can apply a signed correction to the current character's and account-wide net earnings. Enter +500g to add 500 gold or -500g to subtract it. The correction updates Today, This Week, This Month, and Total Recorded, but does not change wallet gold or source-category totals. Overall Income Adjustment changes Account Total Recorded only, leaving character totals, period history, actual funds, and distributable profit unchanged."
     },
     {
         "MINI DASHBOARD",
